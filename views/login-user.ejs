@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login User / Petugas</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: linear-gradient(135deg, #0d3b66, #1a4a76);
+        margin: 0;
+      }
+      .login-box {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 15px 25px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-width: 320px;
+        text-align: center;
+      }
+      .login-box h2 {
+        margin-top: 0;
+        color: #0d3b66;
+        font-size: 28px;
+      }
+      .login-box p {
+        color: #555;
+        margin-bottom: 25px;
+      }
+      input {
+        width: 100%;
+        padding: 12px 15px;
+        margin: 10px 0;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        box-sizing: border-box;
+        font-size: 16px;
+        transition: border 0.3s;
+      }
+      input:focus {
+        outline: none;
+        border-color: #0d3b66;
+      }
+      button {
+        width: 100%;
+        padding: 14px;
+        background-color: #ffeb3b;
+        color: #0d3b66;
+        border: none;
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin-top: 10px;
+      }
+      button:hover {
+        background-color: #fdd835;
+      }
+      .back-link {
+        display: block;
+        margin-top: 25px;
+        color: #0d3b66;
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-box">
+      <h2>Petugas Loket</h2>
+      <p>Silakan login untuk memanggil antrian.</p>
+      <form id="loginForm">
+        <input
+          type="text"
+          id="ipaddress"
+          placeholder="IP Address Server (Misal: 192.168.1.10)"
+          required
+        />
+        <input type="text" id="username" placeholder="Username" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <button type="submit">Masuk Panel</button>
+      </form>
+      <a href="/" class="back-link">← Kembali</a>
+    </div>
+
+    <script>
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const ip = document.getElementById("ipaddress").value;
+          const u = document.getElementById("username").value;
+          const p = document.getElementById("password").value;
+
+          try {
+            const baseURL = `http://${ip}:3000`;
+            const res = await fetch(`${baseURL}/api/login`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: u, password: p }),
+            });
+
+            const data = await res.json();
+            if (data.success && data.role === "user") {
+              localStorage.setItem("loketName", data.name);
+              localStorage.setItem("serverIP", ip);
+              window.location.href = "/loket";
+            } else {
+              alert("Kredensial User Tidak Valid!");
+            }
+          } catch (error) {
+            alert(
+              "Gagal terhubung ke Server! Pastikan IP Address benar dan Server sedang berjalan.",
+            );
+          }
+        });
+    </script>
+  </body>
+</html>

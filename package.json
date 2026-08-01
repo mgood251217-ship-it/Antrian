@@ -1,0 +1,18 @@
+{
+  "name": "antrian",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "ejs": "^5.0.2",
+    "express": "^5.2.1",
+    "sqlite3": "^5.1.6",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1"
+  }
+}

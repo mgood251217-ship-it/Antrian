@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-require('./server.js');
+require('./server.cjs');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -13,8 +13,12 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
 
+  const startUrl = process.env.NODE_ENV === 'production'
+    ? `file://${path.join(__dirname, '../dist/index.html')}`
+    : 'http://localhost:5178';
+
   setTimeout(() => {
-    win.loadURL('http://localhost:3000');
+    win.loadURL(startUrl);
   }, 4000);
 }
 

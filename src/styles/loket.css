@@ -1,0 +1,78 @@
+.card {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 24px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+  color: #e2e8f0;
+}
+
+.card h2 {
+  margin: 0 0 18px;
+  font-size: 32px;
+}
+
+.card label {
+  display: block;
+  margin-bottom: 8px;
+  color: #94a3b8;
+}
+
+.card select,
+.card button {
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 16px;
+}
+
+.card .preview-text,
+.card .nomor-display,
+.card .waktu-berjalan {
+  margin-bottom: 18px;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.card .nomor-display {
+  font-size: 48px;
+  font-weight: 700;
+  color: #facc15;
+}
+
+.card button.btn-primary {
+  background: #38bdf8;
+  color: #020617;
+}
+
+.card button.btn-warning {
+  background: #facc15;
+  color: #0f172a;
+}
+
+.card button.btn-success {
+  background: #22c55e;
+  color: #0f172a;
+}
+
+.card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card .logout {
+  display: inline-block;
+  margin-top: 8px;
+  color: #cbd5e1;
+  text-decoration: none;
+}
+
+.card .logout:hover {
+  text-decoration: underline;
+}

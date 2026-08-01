@@ -1,4 +1,4 @@
-﻿const sqlite3 = require('sqlite3');
+const sqlite3 = require('sqlite3');
 const path = require('path');
 const fs = require('fs');
 
@@ -22,20 +22,29 @@ function initDB() {
             role TEXT,
             name TEXT
           )
-        `, (err) => {
-          if (err) return reject(err);
-        });
+        `);
 
         db.run(`
           CREATE TABLE IF NOT EXISTS antrian (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            loket TEXT,
+            type_id INTEGER,
             nomor TEXT,
-            status TEXT DEFAULT 'menunggu'
+            status TEXT DEFAULT 'menunggu',
+            loket TEXT,
+            datetime DATETIME DEFAULT CURRENT_TIMESTAMP,
+            waktu_panggil DATETIME,
+            waktu_selesai DATETIME
           )
-        `, (err) => {
-          if (err) return reject(err);
-        });
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS jenis_antrian (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nama TEXT,
+            kode_huruf TEXT,
+            current_number INTEGER DEFAULT 0
+          )
+        `);
 
         db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
           if (err) return reject(err);
@@ -48,8 +57,20 @@ function initDB() {
               ('loket2', 'user123', 'user', '2'),
               ('loket3', 'user123', 'user', '3')
             `;
+            db.run(insertData);
+          }
+        });
 
-            db.run(insertData, (err) => {
+        db.get('SELECT COUNT(*) AS count FROM jenis_antrian', (err, row) => {
+          if (err) return reject(err);
+
+          if (!row || row.count === 0) {
+            const insertJenis = `
+              INSERT INTO jenis_antrian (nama, kode_huruf, current_number) VALUES
+              ('Teller', 'A', 0),
+              ('Customer Service', 'B', 0)
+            `;
+            db.run(insertJenis, (err) => {
               if (err) return reject(err);
               resolve(db);
             });

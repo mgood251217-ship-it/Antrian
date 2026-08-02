@@ -1,8 +1,31 @@
 :root {
-  --text: #6b6375;
+  --background: radial-gradient(circle at top, #0f172a, #020617 70%);
+  
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+
+  --secondary: #6b7280;
+  --secondary-hover: #4b5563;
+
+  --success: #22c55e;
+  --success-hover: #166534;
+
+  --info: #38bdf8;
+  --info-hover: #0284c7;
+
+  --warning: #eab308;
+  --warning-hover: #ca8a04;
+
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+
+  --bg-card: rgba(15, 23, 42, 0.95);
+  --text: #fcfbfb;
+  --text-muted: #666666;
+  --border: rgba(22, 52, 124, 0.95);
+  
   --text-h: #08060d;
   --bg: #fff;
-  --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
@@ -30,33 +53,26 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
 }
 
 body {
-  margin: 0;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #root {
+  width: 100%;
+  min-height: 100dvh;
   text-align: center;
-  border-inline: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -66,11 +82,11 @@ h1,
 h2 {
   font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 h1 {
-  font-size: 56px;
+  font-size: 45px;
   letter-spacing: -1.68px;
   margin: 32px 0;
   @media (max-width: 1024px) {
@@ -96,7 +112,7 @@ code,
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 code {

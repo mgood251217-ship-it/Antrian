@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from '../config'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
-import Input from '../components/ui/Input'
-import './PageStyles.css'
+import Button from '../components/Button/Button'
+import Card from '../components/Card/Card'
+import Input from '../components/Input/Input'
+import Section from '../components/Section/Section'
 
 export default function LoginServer() {
   const [username, setUsername] = useState('')
@@ -34,21 +34,21 @@ export default function LoginServer() {
   }
 
   return (
-    <div className="page-shell">
-      <Card className="card">
+    <Section>
+      <Card >
         <div className="page-header-row">
           <Button type="button" onClick={() => navigate(-1)}>
             ← Kembali
           </Button>
         </div>
         <h1>Login Server</h1>
-        <form onSubmit={handleSubmit}>
+        <form className="form-group" onSubmit={handleSubmit}>
           <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" required />
           <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" required />
           <Button type="submit">Masuk</Button>
         </form>
         {error && <p className="error">{error}</p>}
       </Card>
-    </div>
+    </Section>
   )
 }

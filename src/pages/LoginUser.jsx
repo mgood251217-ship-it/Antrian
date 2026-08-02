@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
-import Input from '../components/ui/Input'
-import './PageStyles.css'
+import Button from '../components/Button/Button'
+import Card from '../components/Card/Card'
+import Input from '../components/Input/Input'
+import Section from '../components/Section/Section'
 
 export default function LoginUser() {
   const [ip, setIp] = useState('localhost')
@@ -37,15 +37,15 @@ export default function LoginUser() {
   }
 
   return (
-    <div className="page-shell">
-      <Card className="card">
+    <Section>
+      <Card>
         <div className="page-header-row">
           <Button type="button" onClick={() => navigate(-1)}>
             ← Kembali
           </Button>
         </div>
         <h1>Login Petugas</h1>
-        <form onSubmit={handleSubmit}>
+        <form className="form-group" onSubmit={handleSubmit}>
           <Input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="IP Server" required />
           <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" required />
           <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" required />
@@ -53,6 +53,6 @@ export default function LoginUser() {
         </form>
         {error && <p className="error">{error}</p>}
       </Card>
-    </div>
+    </Section>
   )
 }

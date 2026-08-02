@@ -1,17 +1,25 @@
-import { Link } from 'react-router-dom'
-import './PageStyles.css'
+import { useNavigate } from 'react-router-dom'
+import Button from '../components/Button/Button'
+import Card from '../components/Card/Card'
+import Section from '../components/Section/Section'
 
 export default function Home() {
+  const navigate = useNavigate()
+
   return (
-    <div className="page-shell">
-      <div className="card">
+    <Section >
+      <Card>
         <h1>Aplikasi Antrian</h1>
         <p>Pilih mode berikut untuk melanjutkan.</p>
-        <div className="button-grid">
-          <Link className="button" to="/login-server">Login Server</Link>
-          <Link className="button" to="/login-user">Login Petugas</Link>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
+          <Button onClick={() => navigate('/login-server')} variant="danger">
+            Login Server
+          </Button>
+          <Button onClick={() => navigate('/login-user')}>
+            Login Petugas
+          </Button>
         </div>
-      </div>
-    </div>
+      </Card>
+    </Section>
   )
 }

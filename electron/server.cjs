@@ -59,6 +59,29 @@ function getNetworkIP() {
       });
     });
 
+    app.get('/api/server-info', (req, res) => {
+      res.json({ success: true, ip: getNetworkIP() });
+    });
+
+    app.get('/api/pengaturan_toko', (req, res) => {
+      db.get('SELECT * FROM pengaturan_toko WHERE id = 1', [], (err, row) => {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true, data: row });
+      });
+    });
+
+    app.post('/api/pengaturan_toko', (req, res) => {
+      const { nama_toko, logo_toko, running_text } = req.body;
+      db.run(`
+        INSERT OR REPLACE INTO pengaturan_toko (id, nama_toko, logo_toko, running_text) 
+        VALUES (1, ?, ?, ?)
+      `, [nama_toko, logo_toko, running_text], function(err) {
+        if (err) return res.status(500).json({ success: false });
+        io.emit('update_toko', { nama_toko, logo_toko, running_text });
+        res.json({ success: true });
+      });
+    });
+
     app.get('/api/jenis_antrian', (req, res) => {
       db.all('SELECT * FROM jenis_antrian', [], (err, rows) => {
         if (err) return res.status(500).json({ success: false });
@@ -66,15 +89,19 @@ function getNetworkIP() {
       });
     });
 
-    app.get('/api/server-info', (req, res) => {
-      res.json({ success: true, ip: getNetworkIP() });
-    });
-
     app.post('/api/jenis_antrian', (req, res) => {
-      const { nama, kode_huruf } = req.body;
-      db.run('INSERT INTO jenis_antrian (nama, kode_huruf) VALUES (?, ?)', [nama, kode_huruf], function(err) {
+      const { nama, kode_huruf, shortcut } = req.body;
+      db.run('INSERT INTO jenis_antrian (nama, kode_huruf, shortcut) VALUES (?, ?, ?)', [nama, kode_huruf, shortcut], function(err) {
         if (err) return res.status(500).json({ success: false });
         res.json({ success: true, id: this.lastID });
+      });
+    });
+
+    app.post('/api/jenis_antrian/edit', (req, res) => {
+      const { id, nama, kode_huruf, shortcut } = req.body;
+      db.run('UPDATE jenis_antrian SET nama = ?, kode_huruf = ?, shortcut = ? WHERE id = ?', [nama, kode_huruf, shortcut, id], function(err) {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true });
       });
     });
 

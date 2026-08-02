@@ -1,8 +1,8 @@
-import './ui.css'
+import './Card.css'
 
 export default function Card({ children, className = '', ...props }) {
   return (
-    <div className={`ui-card ${className}`.trim()} {...props}>
+    <div className={`card ${className}`.trim()} {...props}>
       {children}
     </div>
   )

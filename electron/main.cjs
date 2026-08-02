@@ -13,6 +13,21 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
 
+  win.webContents.on('before-input-event', (event, input) => {
+    const isDevToolsShortcut =
+      input.key === 'F12' ||
+      (input.key && input.key.toLowerCase() === 'i' && input.control && input.shift);
+
+    if (isDevToolsShortcut) {
+      event.preventDefault();
+      if (win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+      } else {
+        win.webContents.openDevTools();
+      }
+    }
+  });
+
   const startUrl = process.env.NODE_ENV === 'production'
     ? `file://${path.join(__dirname, '../dist/index.html')}`
     : 'http://localhost:5178';

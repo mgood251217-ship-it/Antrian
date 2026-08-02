@@ -1,0 +1,26 @@
+:root {
+  --background: radial-gradient(circle at top, #0f172a, #020617 70%);
+  
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+
+  --secondary: #6b7280;
+  --secondary-hover: #4b5563;
+
+  --success: #22c55e;
+  --success-hover: #166534;
+
+  --info: #38bdf8;
+  --info-hover: #0284c7;
+
+  --warning: #eab308;
+  --warning-hover: #ca8a04;
+
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+
+  --bg-card: rgba(15, 23, 42, 0.95);
+  --text: #333333;
+  --text-muted: #666666;
+  --border: rgba(22, 52, 124, 0.95);
+}

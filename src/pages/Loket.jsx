@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import '../styles/loket.css';
 
 export default function Loket() {
   const navigate = useNavigate();

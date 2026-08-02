@@ -42,13 +42,22 @@ function initDB() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nama TEXT,
             kode_huruf TEXT,
+            shortcut TEXT,
             current_number INTEGER DEFAULT 0
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS pengaturan_toko (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            nama_toko TEXT,
+            logo_toko TEXT,
+            running_text TEXT
           )
         `);
 
         db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
           if (err) return reject(err);
-
           if (!row || row.count === 0) {
             const insertData = `
               INSERT INTO users (username, password, role, name) VALUES
@@ -63,21 +72,29 @@ function initDB() {
 
         db.get('SELECT COUNT(*) AS count FROM jenis_antrian', (err, row) => {
           if (err) return reject(err);
-
           if (!row || row.count === 0) {
             const insertJenis = `
-              INSERT INTO jenis_antrian (nama, kode_huruf, current_number) VALUES
-              ('Teller', 'A', 0),
-              ('Customer Service', 'B', 0)
+              INSERT INTO jenis_antrian (nama, kode_huruf, shortcut, current_number) VALUES
+              ('Teller', 'A', '1', 0),
+              ('Customer Service', 'B', '2', 0)
             `;
             db.run(insertJenis, (err) => {
               if (err) return reject(err);
-              resolve(db);
             });
-          } else {
-            resolve(db);
           }
         });
+
+        db.get('SELECT COUNT(*) AS count FROM pengaturan_toko', (err, row) => {
+          if (err) return reject(err);
+          if (!row || row.count === 0) {
+            db.run(`
+              INSERT INTO pengaturan_toko (id, nama_toko, logo_toko, running_text) 
+              VALUES (1, 'BANK INDONESIA JAMBI', '', 'Selamat datang di Bank Indonesia Jambi - Harap menunggu antrian Anda dipanggil')
+            `);
+          }
+        });
+
+        resolve(db);
       });
     });
   });

@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from '../config'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
-import Input from '../components/ui/Input'
-import './PageStyles.css'
+import Button from '../components/Button/Button'
+import Card from '../components/Card/Card'
+import Input from '../components/Input/Input'
 
 export default function Pengaturan() {
   const navigate = useNavigate()
   const [ipAddress, setIpAddress] = useState('')
+
   const [nama, setNama] = useState('')
   const [kodeHuruf, setKodeHuruf] = useState('')
+  const [shortcut, setShortcut] = useState('')
   const [jenis, setJenis] = useState([])
+  const [editingId, setEditingId] = useState(null)
+
+  const [namaToko, setNamaToko] = useState('')
+  const [logoToko, setLogoToko] = useState('')
+  const [runningText, setRunningText] = useState('')
 
   useEffect(() => {
     const loadServerInfo = async () => {
@@ -24,7 +30,7 @@ export default function Pengaturan() {
           return
         }
       } catch (error) {
-        console.error('Gagal memuat info server:', error)
+        console.error(error)
       }
 
       const apiUrl = getApiUrl()
@@ -39,6 +45,7 @@ export default function Pengaturan() {
 
     fetchJenis()
     loadServerInfo()
+    fetchPengaturanToko()
   }, [])
 
   const fetchJenis = async () => {
@@ -47,16 +54,50 @@ export default function Pengaturan() {
     if (data.success) setJenis(data.data)
   }
 
-  const addJenis = async (e) => {
+  const fetchPengaturanToko = async () => {
+    const res = await fetch(`${getApiUrl()}/api/pengaturan_toko`)
+    const data = await res.json()
+    if (data.success && data.data) {
+      setNamaToko(data.data.nama_toko || '')
+      setLogoToko(data.data.logo_toko || '')
+      setRunningText(data.data.running_text || '')
+    }
+  }
+
+  const savePengaturanToko = async (e) => {
     e.preventDefault()
-    await fetch(`${getApiUrl()}/api/jenis_antrian`, {
+    await fetch(`${getApiUrl()}/api/pengaturan_toko`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama, kode_huruf: kodeHuruf })
+      body: JSON.stringify({ nama_toko: namaToko, logo_toko: logoToko, running_text: runningText })
     })
+    alert('Pengaturan toko berhasil disimpan')
+  }
+
+  const saveJenis = async (e) => {
+    e.preventDefault()
+    const endpoint = editingId ? '/api/jenis_antrian/edit' : '/api/jenis_antrian'
+    await fetch(`${getApiUrl()}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingId, nama, kode_huruf: kodeHuruf, shortcut })
+    })
+    resetFormJenis()
+    fetchJenis()
+  }
+
+  const editJenis = (item) => {
+    setEditingId(item.id)
+    setNama(item.nama)
+    setKodeHuruf(item.kode_huruf)
+    setShortcut(item.shortcut || '')
+  }
+
+  const resetFormJenis = () => {
+    setEditingId(null)
     setNama('')
     setKodeHuruf('')
-    fetchJenis()
+    setShortcut('')
   }
 
   const hapusJenis = async (id) => {
@@ -69,34 +110,114 @@ export default function Pengaturan() {
   }
 
   return (
-    <div className="page-shell">
-      <Card className="card">
-        <div className="page-header-row">
-          <Button type="button" onClick={() => navigate(-1)}>
+    <div style={{ width: '100%', minHeight: '100vh', padding: '24px', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg-root)', color: 'var(--text)' }}>
+        
+        <div style={{ width: '100%', marginBottom: '24px' }}>
+          <Button type="button" onClick={() => navigate(-1)} variant="danger" style={{ cursor: 'pointer' }}>
             ← Kembali
           </Button>
         </div>
-        <h1>Pengaturan Server</h1>
-        <p>IP Server: {ipAddress}</p>
-        <form className="form-group" onSubmit={addJenis}>
-          <Input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama Antrian" required />
-          <Input value={kodeHuruf} onChange={(e) => setKodeHuruf(e.target.value)} placeholder="Kode Huruf" required maxLength={2} />
-          <Button type="submit">Tambah Jenis</Button>
-        </form>
-        <div className="list-box">
-          {jenis.map((item) => (
-            <div key={item.id} className="list-item">
-              <span>{item.nama} ({item.kode_huruf})</span>
-              <Button variant="danger" type="button" onClick={() => hapusJenis(item.id)}>
-                Hapus
-              </Button>
+
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          
+          <Card style={{ flex: 1, minWidth: '350px',  padding: '32px', boxSizing: 'border-box'}}>
+            <h1 style={{ marginTop: 0, marginBottom: '8px', fontSize: '28px', color: 'var(--text)' }}>Pengaturan Server</h1>
+            <p style={{ margin: '0 0 32px 0', color: 'var(--text-muted)', fontSize: '16px' }}>IP Server: {ipAddress}</p>
+
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px', color: 'var(--text)' }}>Pengaturan Toko</h2>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }} onSubmit={savePengaturanToko}>
+              <Input
+                value={namaToko}
+                onChange={(e) => setNamaToko(e.target.value)}
+                placeholder="Nama Toko"
+                required
+              />
+              <Input
+                value={logoToko}
+                onChange={(e) => setLogoToko(e.target.value)}
+                placeholder="URL / Path Logo Toko"
+                required
+              />
+              <Input
+                value={runningText}
+                onChange={(e) => setRunningText(e.target.value)}
+                placeholder="Running Text Display"
+                required
+              />
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
+                <Button type="submit" variant="success" style={{ cursor: 'pointer', padding: '12px 24px' }}>Simpan Pengaturan Toko</Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card style={{ flex: 1, minWidth: '350px', padding: '32px', boxSizing: 'border-box' }}>
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px', marginTop: 0, color: 'var(--text)' }}>Jenis Antrian & Loket</h2>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }} onSubmit={saveJenis}>
+              <Input
+                value={nama}
+                onChange={(e) => setNama(e.target.value)}
+                placeholder="Nama Antrian"
+                required
+              />
+              <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
+                <div style={{ flex: 1 }}>
+                  <Input
+                    value={kodeHuruf}
+                    onChange={(e) => setKodeHuruf(e.target.value)}
+                    placeholder="Kode (Cth: A)"
+                    required
+                    maxLength={2}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Input
+                    value={shortcut}
+                    onChange={(e) => setShortcut(e.target.value)}
+                    placeholder="Shortcut"
+                    required
+                    maxLength={1}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
+                <Button type="submit" variant="primary" style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                  {editingId ? 'Simpan Perubahan' : 'Tambah Jenis'}
+                </Button>
+                {editingId && (
+                  <Button type="button" variant="secondary" onClick={resetFormJenis} style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                    Batal
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+              {jenis.map((item) => (
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <strong style={{ fontSize: '18px', color: 'var(--text)' }}>{item.nama}</strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>({item.kode_huruf}) · Shortcut: {item.shortcut || '-'}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <Button type="button" variant="secondary" onClick={() => editJenis(item)} style={{ cursor: 'pointer' }}>
+                      Edit
+                    </Button>
+                    <Button variant="danger" type="button" onClick={() => hapusJenis(item.id)} style={{ cursor: 'pointer' }}>
+                      Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+
+            <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', width: '100%', borderTop: '2px solid var(--border-color)', paddingTop: '24px' }}>
+              <a href="/display" style={{ display: 'inline-block', padding: '14px 32px', backgroundColor: 'var(--primary)', color: '#fff', textDecoration: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', cursor: 'pointer' }}>
+                Buka Display
+              </a>
+            </div>
+          </Card>
+          
         </div>
-        <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <a href="/display" className="button">Buka Display</a>
-        </div>
-      </Card>
     </div>
   )
 }

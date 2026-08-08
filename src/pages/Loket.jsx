@@ -1,6 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import Button from '../components/Button/Button';
+import Card from '../components/Card/Card';
+import Input from '../components/Input/Input';
+import Select from '../components/Select/Select';
+import Section from '../components/Section/Section';
+import '../styles/variables.css';
 
 export default function Loket() {
   const navigate = useNavigate();
@@ -21,6 +27,10 @@ export default function Loket() {
   const socketRef = useRef();
   const timerIntervalRef = useRef();
   const startTimeRef = useRef();
+
+  const jenisOption = useMemo(() => {
+    return jenisAntrian.map(item => ({ value: item.id, label: item.nama }));
+  }, [jenisAntrian]);
 
   const updateTimer = useCallback(() => {
     if (!startTimeRef.current) return;
@@ -177,54 +187,74 @@ export default function Loket() {
   const handleLogout = (e) => {
     e.preventDefault();
     localStorage.removeItem('loketName');
-    navigate('/')
+    navigate('/');
   };
 
   return (
-    <div className="card">
-      <h2>Loket <span id="namaLoketDisplay">{namaLoket}</span></h2>
+    <Section style={{ backgroundColor: 'var(--bg-root)' }}>
+      <Card style={{ backgroundColor: 'var(--bg-card)', padding: '32px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+        <h2 style={{ margin: 0, fontSize: '26px', color: 'var(--text-main)', textAlign: 'center' }}>
+          Loket <span id="namaLoketDisplay">{namaLoket}</span>
+        </h2>
 
-      <label htmlFor="jenisAntrian">Pilih Jenis Antrian:</label>
-      <select 
-        id="jenisAntrian" 
-        value={selectedJenis}
-        onChange={(e) => setSelectedJenis(e.target.value)}
-      >
-        <option value="">-- Pilih --</option>
-        {jenisAntrian.map(item => (
-          <option key={item.id} value={item.id}>{item.nama}</option>
-        ))}
-      </select>
-      <div className="preview-text">{previewNomor}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <Select
+            label="Pilih Jenis Antrian:"
+            name="category"
+            id="jenisAntrian"
+            value={selectedJenis}
+            onChange={(e) => setSelectedJenis(e.target.value)}
+            options={jenisOption}
+            margin="0"
+            style={{ width: "100%" }}
+          />
+        </div>
 
-      <div className="nomor-display">{displayNomor}</div>
-      
-      <div className="waktu-berjalan">{waktuBerjalan}</div>
+        <div className="preview-text" style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', minHeight: '20px' }}>
+          {previewNomor}
+        </div>
 
-      <button 
-        className="btn-primary" 
-        onClick={handlePanggilNext}
-        disabled={btnPanggilDisabled}
-      >
-        PANGGIL BERIKUTNYA
-      </button>
-      <button 
-        className="btn-warning" 
-        onClick={handlePanggilUlang}
-        disabled={btnUlangDisabled}
-      >
-        PANGGIL ULANG
-      </button>
-      <button 
-        className="btn-success" 
-        onClick={handleSelesai}
-        disabled={btnSelesaiDisabled}
-      >
-        SELESAI
-      </button>
-      
-      <br />
-      <a href="/" className="logout" onClick={handleLogout}>Logout</a>
-    </div>
+        <div className="nomor-display" style={{ fontSize: '64px', fontWeight: 'bold', textAlign: 'center', color: 'var(--primary)', margin: '10px 0' }}>
+          {displayNomor}
+        </div>
+        
+        <div className="waktu-berjalan" style={{ fontSize: '20px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+          {waktuBerjalan}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+          <Button 
+            variant="primary" 
+            onClick={handlePanggilNext}
+            disabled={btnPanggilDisabled}
+            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+          >
+            PANGGIL BERIKUTNYA
+          </Button>
+          <Button 
+            variant="secondary" 
+            onClick={handlePanggilUlang}
+            disabled={btnUlangDisabled}
+            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+          >
+            PANGGIL ULANG
+          </Button>
+          <Button 
+            variant="success" 
+            onClick={handleSelesai}
+            disabled={btnSelesaiDisabled}
+            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+          >
+            SELESAI
+          </Button>
+        </div>
+        
+        <div style={{ textAlign: 'center', marginTop: '10px' }}>
+          <a href="/" className="logout" onClick={handleLogout} style={{ color: 'var(--danger)', textDecoration: 'none', fontWeight: '500' }}>
+            Logout
+          </a>
+        </div>
+      </Card>
+    </Section>
   );
 }

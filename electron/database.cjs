@@ -52,7 +52,8 @@ function initDB() {
             id INTEGER PRIMARY KEY CHECK (id = 1),
             nama_toko TEXT,
             logo_toko TEXT,
-            running_text TEXT
+            running_text TEXT,
+            print_mode TEXT DEFAULT 'langsung'
           )
         `);
 

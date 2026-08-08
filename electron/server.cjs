@@ -5,7 +5,23 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const cors = require('cors');
+const multer = require('multer');
 const initDB = require('./database.cjs');
+
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '.png';
+      cb(null, `logo_${Date.now()}${ext}`);
+    }
+  })
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -50,6 +66,8 @@ function getNetworkIP() {
       app.use(express.static(distPath));
     }
 
+    app.use('/uploads', express.static(uploadsDir));
+
     app.post('/api/login', (req, res) => {
       const { username, password } = req.body;
       db.get('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, row) => {
@@ -70,15 +88,26 @@ function getNetworkIP() {
       });
     });
 
-    app.post('/api/pengaturan_toko', (req, res) => {
-      const { nama_toko, logo_toko, running_text } = req.body;
-      db.run(`
-        INSERT OR REPLACE INTO pengaturan_toko (id, nama_toko, logo_toko, running_text) 
-        VALUES (1, ?, ?, ?)
-      `, [nama_toko, logo_toko, running_text], function(err) {
+    app.post('/api/pengaturan_toko', upload.single('logo'), (req, res) => {
+      const { nama_toko, running_text, print_mode } = req.body;
+
+      db.get('SELECT logo_toko FROM pengaturan_toko WHERE id = 1', [], (err, row) => {
         if (err) return res.status(500).json({ success: false });
-        io.emit('update_toko', { nama_toko, logo_toko, running_text });
-        res.json({ success: true });
+
+        const logo_toko = req.file
+          ? `/uploads/${req.file.filename}`
+          : (row ? row.logo_toko : '');
+
+        const finalPrintMode = print_mode === 'preview' ? 'preview' : 'langsung';
+
+        db.run(`
+          INSERT OR REPLACE INTO pengaturan_toko (id, nama_toko, logo_toko, running_text, print_mode) 
+          VALUES (1, ?, ?, ?, ?)
+        `, [nama_toko, logo_toko, running_text, finalPrintMode], function(err) {
+          if (err) return res.status(500).json({ success: false });
+          io.emit('update_toko', { nama_toko, logo_toko, running_text, print_mode: finalPrintMode });
+          res.json({ success: true, logo_toko, print_mode: finalPrintMode });
+        });
       });
     });
 

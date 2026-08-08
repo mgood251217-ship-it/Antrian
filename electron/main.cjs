@@ -1,15 +1,20 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 require('./server.cjs');
+
+let mainWindow;
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      preload: path.join(__dirname, 'preload.cjs')
     }
   });
+
+  mainWindow = win;
 
   win.setMenuBarVisibility(false);
 
@@ -36,6 +41,12 @@ function createWindow() {
     win.loadURL(startUrl);
   }, 4000);
 }
+
+ipcMain.on('print-ticket', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.print({ silent: true, printBackground: true }, () => {});
+  }
+});
 
 app.whenReady().then(() => {
   createWindow();

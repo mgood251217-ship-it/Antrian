@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { getApiUrl } from '../config'
 
@@ -15,13 +15,39 @@ function formatDate(date) {
   })
 }
 
+function resolveLogoUrl(logo) {
+  if (!logo) return ''
+  if (logo.startsWith('http')) return logo
+  return `${getApiUrl()}${logo.startsWith('/') ? '' : '/'}${logo}`
+}
+
+function printTicketSilently() {
+  try {
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printTicket === 'function') {
+      window.electronAPI.printTicket()
+      return
+    }
+  } catch (error) {
+    console.error(error)
+  }
+  // Fallback jika dijalankan di browser biasa (bukan Electron)
+  window.print()
+}
+
 export default function Display() {
   const [displayState, setDisplayState] = useState({ loketA: '-', currentLoket: '-', lokets: [] })
   const [now, setNow] = useState(new Date())
   const [jenisAntrian, setJenisAntrian] = useState([])
+  const [toko, setToko] = useState({ nama_toko: 'NAMA TOKO', logo_toko: '', running_text: 'Selamat datang', print_mode: 'langsung' })
   const [loadingId, setLoadingId] = useState(null)
-  const [statusMessage, setStatusMessage] = useState('')
   const [ticketData, setTicketData] = useState(null)
+  const [showPreview, setShowPreview] = useState(false)
+  
+  const loadingRef = useRef(loadingId)
+
+  useEffect(() => {
+    loadingRef.current = loadingId
+  }, [loadingId])
 
   const fetchJenisAntrian = useCallback(async () => {
     try {
@@ -31,13 +57,30 @@ export default function Display() {
         setJenisAntrian(result.data || [])
       }
     } catch (error) {
-      console.error('Gagal memuat jenis antrian:', error)
+      console.error(error)
+    }
+  }, [])
+
+  const fetchPengaturanToko = useCallback(async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/pengaturan_toko`)
+      const result = await res.json()
+      if (result.success && result.data) {
+        setToko({
+          nama_toko: result.data.nama_toko || 'NAMA TOKO',
+          logo_toko: result.data.logo_toko || '',
+          running_text: result.data.running_text || 'Selamat datang',
+          print_mode: result.data.print_mode || 'langsung'
+        })
+      }
+    } catch (error) {
+      console.error(error)
     }
   }, [])
 
   const handleAmbilAntrian = async (id) => {
+    if (loadingRef.current === id) return
     setLoadingId(id)
-    setStatusMessage('')
 
     try {
       const res = await fetch(`${getApiUrl()}/api/cetak_antrian`, {
@@ -55,38 +98,42 @@ export default function Display() {
         }
 
         setTicketData(nextTicket)
-        setStatusMessage(`Antrian ${nextTicket.nomor} berhasil diambil.`)
 
-        if (typeof window !== 'undefined') {
-          window.setTimeout(() => window.print(), 300)
+        if (toko.print_mode === 'preview') {
+          setShowPreview(true)
+          setLoadingId(null)
+        } else if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            printTicketSilently()
+            setLoadingId(null)
+          }, 300)
         }
       } else {
-        setStatusMessage('Gagal mengambil antrian. Silakan coba lagi.')
+        setLoadingId(null)
       }
     } catch (error) {
-      console.error('Gagal mengambil antrian:', error)
-      setStatusMessage('Gagal mengambil antrian. Periksa koneksi server.')
-    } finally {
       setLoadingId(null)
     }
   }
 
-  useEffect(() => {
-    const loadJenisAntrian = async () => {
-      await fetchJenisAntrian()
-    }
+  const handleKonfirmasiCetak = () => {
+    printTicketSilently()
+    setShowPreview(false)
+  }
 
-    loadJenisAntrian()
-  }, [fetchJenisAntrian])
+  const handleBatalCetak = () => {
+    setShowPreview(false)
+  }
+
+  useEffect(() => {
+    fetchJenisAntrian()
+    fetchPengaturanToko()
+  }, [fetchJenisAntrian, fetchPengaturanToko])
 
   useEffect(() => {
     const socket = io(getApiUrl())
-    socket.on('connect', () => {
-      console.log('Connected to display socket')
-    })
     socket.on('init_data', (state) => setDisplayState(state))
     socket.on('update_display', (state) => setDisplayState(state))
-    socket.on('connect_error', (err) => console.error('Socket connect error:', err))
 
     return () => socket.disconnect()
   }, [])
@@ -100,14 +147,22 @@ export default function Display() {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         window.history.back()
+        return
+      }
+
+      const matchedAntrian = jenisAntrian.find(
+        (item) => item.shortcut && item.shortcut.toLowerCase() === event.key.toLowerCase()
+      )
+
+      if (matchedAntrian && !loadingRef.current) {
+        handleAmbilAntrian(matchedAntrian.id)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [jenisAntrian])
 
-  // Menyimpan style global, hover, dan print media query
   const globalAndPrintStyles = `
     html, body, #root {
       margin: 0;
@@ -116,40 +171,48 @@ export default function Display() {
       width: 100%;
     }
     body {
-      font-family: Arial, sans-serif;
-      background-color: #0d3b66;
-      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-root);
+      color: var(--text);
       overflow: hidden;
       position: relative;
-    }
-    .print-btn:hover {
-      background-color: #008eb0;
     }
     .print-ticket {
       display: none;
     }
     @media print {
+      @page {
+        margin: 0;
+        size: 58mm auto;
+      }
+      body {
+        background-color: white;
+      }
       body * {
         visibility: hidden;
       }
       .display-page > :not(.print-ticket) {
-        visibility: hidden;
+        display: none !important;
       }
       .print-ticket {
         display: block !important;
-        visibility: visible;
-        position: fixed;
+        position: absolute;
         top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 320px;
-        padding: 24px;
-        border: 2px solid #000;
+        left: 0;
+        width: 58mm;
+        padding: 4mm;
         background: white;
-        color: #000;
+        color: black;
         text-align: center;
-        font-family: Arial, sans-serif;
+        font-family: 'Courier New', Courier, monospace;
         box-sizing: border-box;
+        margin: 0;
+      }
+      .print-ticket * {
+        visibility: visible;
+      }
+      .no-print {
+        display: none !important;
       }
     }
   `
@@ -158,79 +221,94 @@ export default function Display() {
     <div className="display-page" style={{ width: '100%', minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{globalAndPrintStyles}</style>
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 30px', backgroundColor: '#092e52', borderBottom: '3px solid #00a8cc' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ width: '50px', height: '50px', backgroundColor: '#ccc', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'black', fontWeight: 'bold', fontSize: '24px' }}>B</div>
-          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 'normal', letterSpacing: '1px' }}>BANK INDONESIA JAMBI</h1>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 32px', backgroundColor: 'var(--bg-card)', borderBottom: '3px solid var(--primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {toko.logo_toko ? (
+            <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '8px' }} />
+          ) : (
+            <div style={{ width: '56px', height: '56px', backgroundColor: 'var(--primary)', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontWeight: 'bold', fontSize: '24px' }}>
+              {toko.nama_toko.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 'bold', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '1px' }}>{toko.nama_toko}</h1>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '36px', color: '#ffeb3b', margin: 0, fontWeight: 'bold' }}>{formatTime(now)}</p>
-          <p style={{ fontSize: '16px', margin: 0 }}>{formatDate(now)}</p>
+          <p style={{ fontSize: '36px', color: 'var(--primary)', margin: 0, fontWeight: 'bold' }}>{formatTime(now)}</p>
+          <p style={{ fontSize: '16px', color: 'var(--text-muted)', margin: 0 }}>{formatDate(now)}</p>
         </div>
       </header>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '15px', gap: '15px' }}>
-        <div style={{ flex: 0.35, backgroundColor: '#1a4a76', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: '2px solid #00a8cc', boxShadow: 'inset 0 0 50px rgba(0,0,0,0.3)' }}>
-          <p style={{ fontSize: '52px', fontWeight: 'bold', margin: 0 }}>
-            LOKET <span style={{ color: '#ffeb3b' }}>{displayState.currentLoket}</span>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '24px', gap: '24px' }}>
+        <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: '2px solid var(--border-color)', borderRadius: '12px', padding: '24px' }}>
+          <p style={{ fontSize: '42px', fontWeight: 'bold', margin: 0, color: 'var(--text-muted)' }}>
+            LOKET <span style={{ color: 'var(--primary)' }}>{displayState.currentLoket}</span>
           </p>
-          <p style={{ fontSize: '26px', margin: '30px 0 10px 0', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>NOMOR ANTRIAN</p>
-          <p style={{ fontSize: '90px', fontWeight: 'bold', color: '#ffeb3b', margin: 0, textShadow: '3px 3px 6px rgba(0,0,0,0.5)' }}>{displayState.loketA}</p>
+          <p style={{ fontSize: '22px', margin: '32px 0 16px 0', color: 'var(--text)' }}>NOMOR ANTRIAN</p>
+          <p style={{ fontSize: '100px', fontWeight: 'bold', color: 'var(--primary)', margin: 0, lineHeight: 1 }}>{displayState.loketA}</p>
         </div>
 
-        <div style={{ flex: 0.65, border: '2px solid #00a8cc', backgroundColor: '#000', position: 'relative' }}>
+        <div style={{ flex: 0.65, border: '2px solid var(--border-color)', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
           <video width="100%" height="100%" controls autoPlay loop muted style={{ objectFit: 'cover' }}>
             <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
-            Your browser does not support the video tag.
           </video>
         </div>
       </div>
 
-      <div style={{ display: 'flex', backgroundColor: '#1a4a76', borderTop: '3px solid #00a8cc', borderBottom: '3px solid #00a8cc', minHeight: '120px' }}>
+      <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)', minHeight: '140px' }}>
         {displayState.lokets.map((loket, index) => (
-          <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '15px 0', borderRight: index === displayState.lokets.length - 1 ? 'none' : '2px solid #00a8cc', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <p style={{ fontSize: '18px', margin: '0 0 10px 0', fontWeight: 'bold' }}>
-              LOKET <span style={{ color: '#ffeb3b' }}>{loket.name}</span>
+          <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '20px 0', borderRight: index === displayState.lokets.length - 1 ? 'none' : '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <p style={{ fontSize: '20px', margin: '0 0 12px 0', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+              LOKET <span style={{ color: 'var(--primary)' }}>{loket.name}</span>
             </p>
-            <p style={{ fontSize: '38px', fontWeight: 'bold', margin: 0, color: loket.nomor !== '-' ? '#ffeb3b' : 'white' }}>{loket.nomor}</p>
-            <p style={{ marginTop: '10px', fontSize: '14px', color: loket.online ? '#5cb85c' : '#fb7185' }}>
+            <p style={{ fontSize: '42px', fontWeight: 'bold', margin: 0, color: loket.nomor !== '-' ? 'var(--text)' : 'var(--text-muted)' }}>{loket.nomor}</p>
+            <p style={{ marginTop: '12px', fontSize: '14px', fontWeight: '500', color: loket.online ? '#10b981' : '#ef4444' }}>
               {loket.online ? 'Online' : 'Offline'}
             </p>
           </div>
         ))}
       </div>
 
-      <div style={{ backgroundColor: '#092e52', padding: '12px', fontSize: '28px', color: '#ffeb3b', fontWeight: 'bold' }}>
-        <marquee>
-          Unlimited running text - Selamat datang di Bank Indonesia Jambi - Harap menunggu antrian Anda dipanggil
-        </marquee>
+      <div style={{ backgroundColor: 'var(--bg-root)', padding: '16px', fontSize: '24px', color: 'var(--primary)', fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
+        <marquee>{toko.running_text}</marquee>
       </div>
 
-      <div style={{ position: 'absolute', top: '100px', right: '30px', background: 'rgba(9, 46, 82, 0.9)', padding: '20px', border: '2px solid #00a8cc', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 1000, width: '250px' }}>
-        <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#fff', fontSize: '18px' }}>AMBIL ANTRIAN</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {jenisAntrian.map((item, index) => (
-            <button
-              key={item.id}
-              className="print-btn"
-              style={{ width: '100%', padding: '15px', marginBottom: index === jenisAntrian.length - 1 ? 0 : '10px', backgroundColor: '#00a8cc', color: 'white', border: 'none', borderRadius: '6px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.3s' }}
-              onClick={() => handleAmbilAntrian(item.id)}
-              disabled={loadingId === item.id}
-            >
-              {loadingId === item.id ? 'Memproses...' : `Ambil ${item.nama}`}
-            </button>
-          ))}
+      {showPreview && ticketData && (
+        <div className="no-print" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '32px', width: '320px', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ margin: '0 0 16px 0', color: 'var(--text)' }}>Preview Antrian</h2>
+            {toko.logo_toko && <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'contain', marginBottom: '12px' }} />}
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 4px 0' }}>{ticketData.nama}</p>
+            <p style={{ fontSize: '48px', fontWeight: 'bold', color: 'var(--primary)', margin: '8px 0' }}>{ticketData.nomor}</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 24px 0' }}>{ticketData.waktu}</p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handleBatalCetak}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '15px' }}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleKonfirmasiCetak}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#fff', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}
+              >
+                Cetak
+              </button>
+            </div>
+          </div>
         </div>
-        {statusMessage && <p style={{ marginTop: '10px', color: '#fff', textAlign: 'center' }}>{statusMessage}</p>}
-      </div>
+      )}
 
       {ticketData && (
         <div className="print-ticket">
-          <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '2px' }}>ANTRIAN</div>
-          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '10px' }}>{ticketData.nomor}</div>
-          <div style={{ fontSize: '18px', marginBottom: '10px' }}>{ticketData.nama}</div>
-          <div style={{ fontSize: '13px', marginTop: '8px' }}>{ticketData.waktu}</div>
-          <div style={{ fontSize: '13px', marginTop: '8px' }}>Silakan menunggu sampai nomor Anda dipanggil.</div>
+          {toko.logo_toko && <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', marginBottom: '8px' }} />}
+          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>{toko.nama_toko}</div>
+          <div style={{ borderBottom: '1px dashed black', margin: '8px 0' }}></div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '1px' }}>ANTRIAN</div>
+          <div style={{ fontSize: '14px', marginBottom: '12px' }}>{ticketData.nama}</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', margin: '12px 0' }}>{ticketData.nomor}</div>
+          <div style={{ borderBottom: '1px dashed black', margin: '12px 0' }}></div>
+          <div style={{ fontSize: '11px', marginTop: '8px' }}>{ticketData.waktu}</div>
+          <div style={{ fontSize: '11px', marginTop: '8px', padding: '0 4px' }}>Silakan menunggu sampai nomor Anda dipanggil.</div>
         </div>
       )}
     </div>

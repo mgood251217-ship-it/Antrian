@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import Input from '../components/Input/Input'
 import Section from '../components/Section/Section'
+import { setSession, getSession } from '../services/session'
 
 export default function LoginUser() {
   const [ip, setIp] = useState('localhost')
@@ -11,6 +12,13 @@ export default function LoginUser() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const session = getSession()
+    if (session) {
+      navigate('/loket')
+    }
+  }, [navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -24,9 +32,9 @@ export default function LoginUser() {
         body: JSON.stringify({ username, password })
       })
       const data = await res.json()
+      
       if (data.success && data.role === 'user') {
-        localStorage.setItem('loketName', data.name)
-        localStorage.setItem('serverIP', ip)
+        setSession({ name: data.name, ip: ip })
         navigate('/loket')
       } else {
         setError('Kredensial user tidak valid.')

@@ -4,6 +4,7 @@ import { getApiUrl } from '../config'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import Input from '../components/Input/Input'
+import Select from '../components/Select/Select'
 
 export default function Pengaturan() {
   const navigate = useNavigate()
@@ -17,7 +18,10 @@ export default function Pengaturan() {
 
   const [namaToko, setNamaToko] = useState('')
   const [logoToko, setLogoToko] = useState('')
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState('')
   const [runningText, setRunningText] = useState('')
+  const [printMode, setPrintMode] = useState('langsung')
 
   useEffect(() => {
     const loadServerInfo = async () => {
@@ -61,17 +65,36 @@ export default function Pengaturan() {
       setNamaToko(data.data.nama_toko || '')
       setLogoToko(data.data.logo_toko || '')
       setRunningText(data.data.running_text || '')
+      setPrintMode(data.data.print_mode || 'langsung')
+    }
+  }
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setLogoFile(file)
+      setLogoPreview(URL.createObjectURL(file))
     }
   }
 
   const savePengaturanToko = async (e) => {
     e.preventDefault()
+    const formData = new FormData()
+    formData.append('nama_toko', namaToko)
+    formData.append('running_text', runningText)
+    formData.append('print_mode', printMode)
+    if (logoFile) {
+      formData.append('logo', logoFile)
+    }
+
     await fetch(`${getApiUrl()}/api/pengaturan_toko`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama_toko: namaToko, logo_toko: logoToko, running_text: runningText })
+      body: formData
     })
+    
+    setLogoFile(null)
     alert('Pengaturan toko berhasil disimpan')
+    fetchPengaturanToko()
   }
 
   const saveJenis = async (e) => {
@@ -120,7 +143,7 @@ export default function Pengaturan() {
 
         <div style={{ width: '100%', display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           
-          <Card style={{ flex: 1, minWidth: '350px',  padding: '32px', boxSizing: 'border-box'}}>
+          <Card style={{ flex: 1, minWidth: '350px', padding: '32px', boxSizing: 'border-box'}}>
             <h1 style={{ marginTop: 0, marginBottom: '8px', fontSize: '28px', color: 'var(--text)' }}>Pengaturan Server</h1>
             <p style={{ margin: '0 0 32px 0', color: 'var(--text-muted)', fontSize: '16px' }}>IP Server: {ipAddress}</p>
 
@@ -132,18 +155,51 @@ export default function Pengaturan() {
                 placeholder="Nama Toko"
                 required
               />
-              <Input
-                value={logoToko}
-                onChange={(e) => setLogoToko(e.target.value)}
-                placeholder="URL / Path Logo Toko"
-                required
-              />
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Upload Logo Toko</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    background: 'inherit',
+                    color: 'var(--text)',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {(logoPreview || logoToko) && (
+                  <img
+                    src={logoPreview || (logoToko.startsWith('http') ? logoToko : `${getApiUrl()}${logoToko.startsWith('/') ? '' : '/'}${logoToko}`)}
+                    alt="Preview"
+                    style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '8px', marginTop: '8px' }}
+                  />
+                )}
+              </div>
+
               <Input
                 value={runningText}
                 onChange={(e) => setRunningText(e.target.value)}
                 placeholder="Running Text Display"
                 required
               />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Mode Cetak Antrian di Display</span>
+                <Select
+                  value={printMode}
+                  onChange={(e) => setPrintMode(e.target.value)}
+                  options={[
+                    { value: 'langsung', label: 'Cetak Langsung' },
+                    { value: 'preview', label: 'Tampilkan Preview Dulu' }
+                  ]}
+                  margin="0"
+                  style={{ width: '100%' }}
+                />
+              </div>
               <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
                 <Button type="submit" variant="success" style={{ cursor: 'pointer', padding: '12px 24px' }}>Simpan Pengaturan Toko</Button>
               </div>

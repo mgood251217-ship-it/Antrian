@@ -1,16 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from '../config'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import Input from '../components/Input/Input'
 import Section from '../components/Section/Section'
+import { setServerSession, getServerSession } from '../services/session'
 
 export default function LoginServer() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const session = getServerSession()
+    if (session) {
+      navigate('/pengaturan')
+    }
+  }, [navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,7 +31,9 @@ export default function LoginServer() {
         body: JSON.stringify({ username, password })
       })
       const data = await res.json()
+      
       if (data.success && data.role === 'server') {
+        setServerSession({ role: data.role })
         navigate('/pengaturan')
       } else {
         setError('Kredensial server tidak valid.')
@@ -35,7 +45,7 @@ export default function LoginServer() {
 
   return (
     <Section>
-      <Card >
+      <Card>
         <div className="page-header-row">
           <Button type="button" onClick={() => navigate(-1)}>
             ← Kembali

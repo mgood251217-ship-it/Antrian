@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { getApiUrl } from '../config'
 
@@ -21,6 +22,19 @@ function resolveLogoUrl(logo) {
   return `${getApiUrl()}${logo.startsWith('/') ? '' : '/'}${logo}`
 }
 
+function speakPanggilan({ kode_huruf, nomor, loket }) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+
+  const nomorDieja = String(nomor || '').split('').join(' ')
+  const text = `Panggilan ${kode_huruf} ${nomorDieja}, silahkan menuju loket ${loket}`
+
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'id-ID'
+  utterance.rate = 0.95
+  window.speechSynthesis.speak(utterance)
+}
+
 function printTicketSilently() {
   try {
     if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printTicket === 'function') {
@@ -35,6 +49,7 @@ function printTicketSilently() {
 }
 
 export default function Display() {
+  const navigate = useNavigate()
   const [displayState, setDisplayState] = useState({ loketA: '-', currentLoket: '-', lokets: [] })
   const [now, setNow] = useState(new Date())
   const [jenisAntrian, setJenisAntrian] = useState([])
@@ -42,6 +57,7 @@ export default function Display() {
   const [loadingId, setLoadingId] = useState(null)
   const [ticketData, setTicketData] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [antrianCounts, setAntrianCounts] = useState([])
   
   const loadingRef = useRef(loadingId)
 
@@ -134,6 +150,8 @@ export default function Display() {
     const socket = io(getApiUrl())
     socket.on('init_data', (state) => setDisplayState(state))
     socket.on('update_display', (state) => setDisplayState(state))
+    socket.on('update_counts', (counts) => setAntrianCounts(counts || []))
+    socket.on('panggilan_antrian', (data) => speakPanggilan(data))
 
     return () => socket.disconnect()
   }, [])
@@ -146,7 +164,7 @@ export default function Display() {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
-        window.history.back()
+        navigate('/pengaturan')
         return
       }
 
@@ -161,7 +179,7 @@ export default function Display() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [jenisAntrian])
+  }, [jenisAntrian, navigate])
 
   const globalAndPrintStyles = `
     html, body, #root {
@@ -185,8 +203,11 @@ export default function Display() {
         margin: 0;
         size: 58mm auto;
       }
+      html, body, #root, .display-page {
+        background-color: #ffffff !important;
+      }
       body {
-        background-color: white;
+        background-color: #ffffff !important;
       }
       body * {
         visibility: hidden;
@@ -201,8 +222,8 @@ export default function Display() {
         left: 0;
         width: 58mm;
         padding: 4mm;
-        background: white;
-        color: black;
+        background: #ffffff !important;
+        color: #000000;
         text-align: center;
         font-family: 'Courier New', Courier, monospace;
         box-sizing: border-box;
@@ -237,6 +258,33 @@ export default function Display() {
           <p style={{ fontSize: '16px', color: 'var(--text-muted)', margin: 0 }}>{formatDate(now)}</p>
         </div>
       </header>
+
+      {antrianCounts.length > 0 && (
+        <div style={{ display: 'flex', gap: '16px', padding: '12px 24px', overflowX: 'auto' }}>
+          {antrianCounts.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>{item.nama}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>({item.kode_huruf})</span>
+              <span style={{ marginLeft: '4px', fontSize: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                {item.jumlah_menunggu}
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>menunggu</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '24px', gap: '24px' }}>
         <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: '2px solid var(--border-color)', borderRadius: '12px', padding: '24px' }}>

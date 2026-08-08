@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "electron": "wait-on http://localhost:5178 && cross-env VITE_DEV_SERVER_URL=http://localhost:5178 electron .",
+    "prestart": "npm run build",
     "start": "concurrently \"npm run dev\" \"npm run electron\"",
     "build": "vite build",
     "lint": "eslint .",

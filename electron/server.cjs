@@ -155,10 +155,9 @@ function getNetworkIP() {
           db.run('INSERT INTO antrian (type_id, nomor, status) VALUES (?, ?, ?)', [id, nomorFormat, 'menunggu'], (err) => {
             if (err) return res.status(500).json({ success: false });
 
-            const nomorLengkap = `${row.kode_huruf} ${nomorFormat}`;
-            displayState.loketA = nomorLengkap;
-            displayState.currentLoket = 'AMBIL ANTRIAN';
-            io.emit('update_display', displayState);
+            // Ambil antrian tidak mengubah tampilan LOKET/NOMOR utama di Display,
+            // itu hanya berubah saat ada panggilan dari Loket.
+            broadcastCounts();
 
             res.json({ success: true, nomor: nomorFormat, nama: row.nama, kode_huruf: row.kode_huruf });
           });
@@ -183,6 +182,20 @@ function getNetworkIP() {
         socketId: null
       }))
     };
+
+    function broadcastCounts() {
+      db.all(`
+        SELECT j.id, j.nama, j.kode_huruf,
+          SUM(CASE WHEN a.status = 'menunggu' THEN 1 ELSE 0 END) AS jumlah_menunggu
+        FROM jenis_antrian j
+        LEFT JOIN antrian a ON a.type_id = j.id
+        GROUP BY j.id
+        ORDER BY j.id
+      `, [], (err, rows) => {
+        if (err) return;
+        io.emit('update_counts', (rows || []).map(r => ({ ...r, jumlah_menunggu: r.jumlah_menunggu || 0 })));
+      });
+    }
 
     app.post('/api/antrian/preview_next', (req, res) => {
       const { type_id } = req.body;
@@ -222,6 +235,8 @@ function getNetworkIP() {
           displayState.currentLoket = namaLoket;
           
           io.emit('update_display', displayState);
+          io.emit('panggilan_antrian', { kode_huruf: row.kode_huruf, nomor: row.nomor, loket: namaLoket });
+          broadcastCounts();
           res.json({ success: true, id_antrian: row.id, nomorLengkap });
         });
       });
@@ -235,6 +250,11 @@ function getNetworkIP() {
       displayState.loketA = nomorLengkap;
       displayState.currentLoket = namaLoket;
       io.emit('update_display', displayState);
+
+      const [kode_huruf, ...rest] = String(nomorLengkap || '').split(' ');
+      const nomor = rest.join(' ');
+      io.emit('panggilan_antrian', { kode_huruf, nomor, loket: namaLoket });
+
       res.json({ success: true });
     });
 
@@ -248,6 +268,7 @@ function getNetworkIP() {
 
     io.on('connection', (socket) => {
       socket.emit('init_data', displayState);
+      broadcastCounts();
 
       socket.on('loket_join', (data) => {
         const loket = displayState.lokets.find(x => x.name === data.namaLoket);

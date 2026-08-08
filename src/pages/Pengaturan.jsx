@@ -5,6 +5,7 @@ import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import Input from '../components/Input/Input'
 import Select from '../components/Select/Select'
+import { clearServerSession } from '../services/session'
 
 export default function Pengaturan() {
   const navigate = useNavigate()
@@ -132,12 +133,17 @@ export default function Pengaturan() {
     fetchJenis()
   }
 
+  const handleLogout = () => {
+    clearServerSession()
+    navigate('/')
+  }
+
   return (
     <div style={{ width: '100%', minHeight: '100vh', padding: '24px', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg-root)', color: 'var(--text)' }}>
         
         <div style={{ width: '100%', marginBottom: '24px' }}>
-          <Button type="button" onClick={() => navigate(-1)} variant="danger" style={{ cursor: 'pointer' }}>
-            ← Kembali
+          <Button type="button" onClick={handleLogout} variant="danger" style={{ cursor: 'pointer' }}>
+            Logout
           </Button>
         </div>
 
@@ -267,9 +273,14 @@ export default function Pengaturan() {
             </div>
 
             <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', width: '100%', borderTop: '2px solid var(--border-color)', paddingTop: '24px' }}>
-              <a href="/display" style={{ display: 'inline-block', padding: '14px 32px', backgroundColor: 'var(--primary)', color: '#fff', textDecoration: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', cursor: 'pointer' }}>
+              <Button
+                type="button"
+                onClick={() => navigate('/display')}
+                variant="primary"
+                style={{ padding: '14px 32px', fontSize: '16px', cursor: 'pointer' }}
+              >
                 Buka Display
-              </a>
+              </Button>
             </div>
           </Card>
           

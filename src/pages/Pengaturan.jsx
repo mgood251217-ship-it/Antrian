@@ -23,6 +23,9 @@ export default function Pengaturan() {
   const [logoPreview, setLogoPreview] = useState('')
   const [runningText, setRunningText] = useState('')
   const [printMode, setPrintMode] = useState('langsung')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoFile, setVideoFile] = useState(null)
+  const [videoPreview, setVideoPreview] = useState('')
 
   useEffect(() => {
     const loadServerInfo = async () => {
@@ -67,6 +70,7 @@ export default function Pengaturan() {
       setLogoToko(data.data.logo_toko || '')
       setRunningText(data.data.running_text || '')
       setPrintMode(data.data.print_mode || 'langsung')
+      setVideoUrl(data.data.video_url || '')
     }
   }
 
@@ -75,6 +79,14 @@ export default function Pengaturan() {
     if (file) {
       setLogoFile(file)
       setLogoPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const handleVideoFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setVideoFile(file)
+      setVideoPreview(URL.createObjectURL(file))
     }
   }
 
@@ -87,6 +99,11 @@ export default function Pengaturan() {
     if (logoFile) {
       formData.append('logo', logoFile)
     }
+    if (videoFile) {
+      formData.append('video', videoFile)
+    } else {
+      formData.append('video_url', videoUrl)
+    }
 
     await fetch(`${getApiUrl()}/api/pengaturan_toko`, {
       method: 'POST',
@@ -94,6 +111,7 @@ export default function Pengaturan() {
     })
     
     setLogoFile(null)
+    setVideoFile(null)
     alert('Pengaturan toko berhasil disimpan')
     fetchPengaturanToko()
   }
@@ -206,6 +224,38 @@ export default function Pengaturan() {
                   style={{ width: '100%' }}
                 />
               </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Video Display (URL)</span>
+                <Input
+                  value={videoUrl}
+                  onChange={(e) => { setVideoUrl(e.target.value); setVideoFile(null); setVideoPreview('') }}
+                  placeholder="https://contoh.com/video.mp4"
+                />
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Atau upload file video (mp4) di bawah ini. Jika upload file, URL di atas akan diabaikan.</span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoFileChange}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    background: 'inherit',
+                    color: 'var(--text)',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {(videoPreview || videoUrl) && (
+                  <video
+                    src={videoPreview || (videoUrl.startsWith('http') ? videoUrl : `${getApiUrl()}${videoUrl.startsWith('/') ? '' : '/'}${videoUrl}`)}
+                    controls
+                    style={{ width: '100%', maxHeight: '160px', borderRadius: '8px', marginTop: '8px', backgroundColor: '#000' }}
+                  />
+                )}
+              </div>
+
               <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
                 <Button type="submit" variant="success" style={{ cursor: 'pointer', padding: '12px 24px' }}>Simpan Pengaturan Toko</Button>
               </div>

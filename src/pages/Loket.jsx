@@ -23,6 +23,7 @@ export default function Loket() {
   const [btnPanggilDisabled, setBtnPanggilDisabled] = useState(false);
   const [btnUlangDisabled, setBtnUlangDisabled] = useState(true);
   const [btnSelesaiDisabled, setBtnSelesaiDisabled] = useState(true);
+  const [antrianCounts, setAntrianCounts] = useState([]);
 
   const socketRef = useRef();
   const timerIntervalRef = useRef();
@@ -83,6 +84,7 @@ export default function Loket() {
       socketRef.current.on('connect', () => {
         socketRef.current.emit('loket_join', { namaLoket });
       });
+      socketRef.current.on('update_counts', (counts) => setAntrianCounts(counts || []));
 
       await fetchJenisAntrian();
     };
@@ -184,6 +186,35 @@ export default function Loket() {
     }
   };
 
+  const handleBatal = async () => {
+    if (!currentAntrianId) return;
+    if (!window.confirm('Batalkan antrian ini? (misal konsumen tidak jadi / tidak menyaut)')) return;
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/antrian/batal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_antrian: currentAntrianId })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setCurrentAntrianId(null);
+        setCurrentNomorLengkap(null);
+        setDisplayNomor('-');
+
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        setWaktuBerjalan('00:00');
+
+        setBtnUlangDisabled(true);
+        setBtnSelesaiDisabled(true);
+        setBtnPanggilDisabled(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan jaringan.');
+    }
+  };
+
   const handleLogout = (e) => {
     e.preventDefault();
     localStorage.removeItem('loketName');
@@ -196,6 +227,29 @@ export default function Loket() {
         <h2 style={{ margin: 0, fontSize: '26px', color: 'var(--text-main)', textAlign: 'center' }}>
           Loket <span id="namaLoketDisplay">{namaLoket}</span>
         </h2>
+
+        {antrianCounts.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+            {antrianCounts.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--bg-root)',
+                  border: '1px solid var(--border-color)'
+                }}
+              >
+                <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-main)' }}>{item.nama}</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>({item.kode_huruf})</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <Select
@@ -246,6 +300,14 @@ export default function Loket() {
             style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
           >
             SELESAI
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={handleBatal}
+            disabled={btnSelesaiDisabled}
+            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+          >
+            BATAL
           </Button>
         </div>
         

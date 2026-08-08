@@ -17,8 +17,9 @@ const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
     filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname) || '.png';
-      cb(null, `logo_${Date.now()}${ext}`);
+      const ext = path.extname(file.originalname) || '';
+      const prefix = file.fieldname === 'video' ? 'video' : 'logo';
+      cb(null, `${prefix}_${Date.now()}${ext}`);
     }
   })
 });
@@ -88,25 +89,32 @@ function getNetworkIP() {
       });
     });
 
-    app.post('/api/pengaturan_toko', upload.single('logo'), (req, res) => {
-      const { nama_toko, running_text, print_mode } = req.body;
+    app.post('/api/pengaturan_toko', upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'video', maxCount: 1 }]), (req, res) => {
+      const { nama_toko, running_text, print_mode, video_url } = req.body;
 
-      db.get('SELECT logo_toko FROM pengaturan_toko WHERE id = 1', [], (err, row) => {
+      db.get('SELECT logo_toko, video_url FROM pengaturan_toko WHERE id = 1', [], (err, row) => {
         if (err) return res.status(500).json({ success: false });
 
-        const logo_toko = req.file
-          ? `/uploads/${req.file.filename}`
+        const logoFile = req.files && req.files.logo && req.files.logo[0];
+        const videoFile = req.files && req.files.video && req.files.video[0];
+
+        const logo_toko = logoFile
+          ? `/uploads/${logoFile.filename}`
           : (row ? row.logo_toko : '');
+
+        const finalVideoUrl = videoFile
+          ? `/uploads/${videoFile.filename}`
+          : (video_url !== undefined ? video_url : (row ? row.video_url : ''));
 
         const finalPrintMode = print_mode === 'preview' ? 'preview' : 'langsung';
 
         db.run(`
-          INSERT OR REPLACE INTO pengaturan_toko (id, nama_toko, logo_toko, running_text, print_mode) 
-          VALUES (1, ?, ?, ?, ?)
-        `, [nama_toko, logo_toko, running_text, finalPrintMode], function(err) {
+          INSERT OR REPLACE INTO pengaturan_toko (id, nama_toko, logo_toko, running_text, print_mode, video_url) 
+          VALUES (1, ?, ?, ?, ?, ?)
+        `, [nama_toko, logo_toko, running_text, finalPrintMode, finalVideoUrl], function(err) {
           if (err) return res.status(500).json({ success: false });
-          io.emit('update_toko', { nama_toko, logo_toko, running_text, print_mode: finalPrintMode });
-          res.json({ success: true, logo_toko, print_mode: finalPrintMode });
+          io.emit('update_toko', { nama_toko, logo_toko, running_text, print_mode: finalPrintMode, video_url: finalVideoUrl });
+          res.json({ success: true, logo_toko, print_mode: finalPrintMode, video_url: finalVideoUrl });
         });
       });
     });
@@ -261,6 +269,14 @@ function getNetworkIP() {
     app.post('/api/antrian/selesai', (req, res) => {
       const { id_antrian } = req.body;
       db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['selesai', id_antrian], (err) => {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true });
+      });
+    });
+
+    app.post('/api/antrian/batal', (req, res) => {
+      const { id_antrian } = req.body;
+      db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['batal', id_antrian], (err) => {
         if (err) return res.status(500).json({ success: false });
         res.json({ success: true });
       });

@@ -22,6 +22,14 @@ function resolveLogoUrl(logo) {
   return `${getApiUrl()}${logo.startsWith('/') ? '' : '/'}${logo}`
 }
 
+const DEFAULT_VIDEO_URL = 'https://www.w3schools.com/html/mov_bbb.mp4'
+
+function resolveVideoUrl(video) {
+  if (!video) return DEFAULT_VIDEO_URL
+  if (video.startsWith('http')) return video
+  return `${getApiUrl()}${video.startsWith('/') ? '' : '/'}${video}`
+}
+
 function speakPanggilan({ kode_huruf, nomor, loket }) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
 
@@ -53,7 +61,7 @@ export default function Display() {
   const [displayState, setDisplayState] = useState({ loketA: '-', currentLoket: '-', lokets: [] })
   const [now, setNow] = useState(new Date())
   const [jenisAntrian, setJenisAntrian] = useState([])
-  const [toko, setToko] = useState({ nama_toko: 'NAMA TOKO', logo_toko: '', running_text: 'Selamat datang', print_mode: 'langsung' })
+  const [toko, setToko] = useState({ nama_toko: 'NAMA TOKO', logo_toko: '', running_text: 'Selamat datang', print_mode: 'langsung', video_url: '' })
   const [loadingId, setLoadingId] = useState(null)
   const [ticketData, setTicketData] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
@@ -86,7 +94,8 @@ export default function Display() {
           nama_toko: result.data.nama_toko || 'NAMA TOKO',
           logo_toko: result.data.logo_toko || '',
           running_text: result.data.running_text || 'Selamat datang',
-          print_mode: result.data.print_mode || 'langsung'
+          print_mode: result.data.print_mode || 'langsung',
+          video_url: result.data.video_url || ''
         })
       }
     } catch (error) {
@@ -296,8 +305,18 @@ export default function Display() {
         </div>
 
         <div style={{ flex: 0.65, border: '2px solid var(--border-color)', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
-          <video width="100%" height="100%" controls autoPlay loop muted style={{ objectFit: 'cover' }}>
-            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+          <video
+            key={toko.video_url}
+            width="100%"
+            height="100%"
+            autoPlay
+            loop
+            muted
+            playsInline
+            disablePictureInPicture
+            style={{ objectFit: 'cover', pointerEvents: 'none' }}
+          >
+            <source src={resolveVideoUrl(toko.video_url)} type="video/mp4" />
           </video>
         </div>
       </div>

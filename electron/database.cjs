@@ -53,7 +53,8 @@ function initDB() {
             nama_toko TEXT,
             logo_toko TEXT,
             running_text TEXT,
-            print_mode TEXT DEFAULT 'langsung'
+            print_mode TEXT DEFAULT 'langsung',
+            video_url TEXT DEFAULT ''
           )
         `);
 

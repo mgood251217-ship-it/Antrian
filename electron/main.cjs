@@ -48,6 +48,11 @@ ipcMain.on('print-ticket', () => {
   }
 });
 
+ipcMain.on('restart-app', () => {
+  app.relaunch();
+  app.exit(0);
+});
+
 app.whenReady().then(() => {
   createWindow();
 

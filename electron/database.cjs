@@ -58,6 +58,13 @@ function initDB() {
           )
         `);
 
+        db.run(`
+          CREATE TABLE IF NOT EXISTS pengaturan_tema (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            variables TEXT
+          )
+        `);
+
         db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
           if (err) return reject(err);
           if (!row || row.count === 0) {

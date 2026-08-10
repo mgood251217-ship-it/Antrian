@@ -6,7 +6,6 @@ import Card from '../components/Card/Card';
 import Input from '../components/Input/Input';
 import Select from '../components/Select/Select';
 import Section from '../components/Section/Section';
-import '../styles/variables.css';
 
 export default function Loket() {
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-:root {
+:root{
   --background: radial-gradient(circle at top, #0f172a, #020617 70%);
   
   --primary: #2563eb;
@@ -20,7 +20,7 @@
   --danger-hover: #dc2626;
 
   --bg-card: rgba(15, 23, 42, 0.95);
-  --text: #f0e9e9;
-  --text-muted: #ccb0b0;
+  --text: #fcfbfb;
+  --text-muted: #666666;
   --border: rgba(22, 52, 124, 0.95);
 }

@@ -282,6 +282,26 @@ function getNetworkIP() {
       });
     });
 
+    app.get('/api/pengaturan_tema', (req, res) => {
+      db.get('SELECT variables FROM pengaturan_tema WHERE id = 1', [], (err, row) => {
+        if (err) return res.status(500).json({ success: false });
+        let data = null;
+        if (row && row.variables) {
+          try { data = JSON.parse(row.variables); } catch (e) { data = null; }
+        }
+        res.json({ success: true, data });
+      });
+    });
+
+    app.post('/api/pengaturan_tema', (req, res) => {
+      const variables = req.body && typeof req.body === 'object' ? req.body : {};
+      db.run(`INSERT OR REPLACE INTO pengaturan_tema (id, variables) VALUES (1, ?)`, [JSON.stringify(variables)], (err) => {
+        if (err) return res.status(500).json({ success: false });
+        io.emit('update_tema', variables);
+        res.json({ success: true });
+      });
+    });
+
     io.on('connection', (socket) => {
       socket.emit('init_data', displayState);
       broadcastCounts();

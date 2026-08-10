@@ -6,6 +6,45 @@ import Card from '../components/Card/Card'
 import Input from '../components/Input/Input'
 import Select from '../components/Select/Select'
 import { clearServerSession } from '../services/session'
+import { DEFAULT_THEME, applyTheme, loadAndApplyTheme } from '../services/theme'
+
+const COLOR_FIELDS = [
+  { key: '--primary', label: 'Primary' },
+  { key: '--primary-hover', label: 'Primary Hover' },
+  { key: '--secondary', label: 'Secondary' },
+  { key: '--secondary-hover', label: 'Secondary Hover' },
+  { key: '--success', label: 'Success' },
+  { key: '--success-hover', label: 'Success Hover' },
+  { key: '--info', label: 'Info' },
+  { key: '--info-hover', label: 'Info Hover' },
+  { key: '--warning', label: 'Warning' },
+  { key: '--warning-hover', label: 'Warning Hover' },
+  { key: '--danger', label: 'Danger' },
+  { key: '--danger-hover', label: 'Danger Hover' },
+  { key: '--text', label: 'Text' },
+  { key: '--text-muted', label: 'Text Muted' },
+  { key: '--bg-card', label: 'Background Card' },
+  { key: '--border', label: 'Border' }
+]
+
+function isHexColor(value) {
+  return typeof value === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim())
+}
+
+function extractHex(value, fallback) {
+  if (isHexColor(value)) return value.trim()
+  const match = typeof value === 'string' && value.match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/)
+  return match ? match[0] : fallback
+}
+
+function parseGradient(value, fallbackStart = '#0f172a', fallbackEnd = '#020617') {
+  const matches = (typeof value === 'string' && value.match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/g)) || []
+  return { start: matches[0] || fallbackStart, end: matches[1] || fallbackEnd }
+}
+
+function buildGradient(start, end) {
+  return `radial-gradient(circle at top, ${start}, ${end} 70%)`
+}
 
 export default function Pengaturan() {
   const navigate = useNavigate()
@@ -26,6 +65,7 @@ export default function Pengaturan() {
   const [videoUrl, setVideoUrl] = useState('')
   const [videoFile, setVideoFile] = useState(null)
   const [videoPreview, setVideoPreview] = useState('')
+  const [themeVars, setThemeVars] = useState(DEFAULT_THEME)
 
   useEffect(() => {
     const loadServerInfo = async () => {
@@ -54,6 +94,7 @@ export default function Pengaturan() {
     fetchJenis()
     loadServerInfo()
     fetchPengaturanToko()
+    loadAndApplyTheme().then((vars) => setThemeVars({ ...DEFAULT_THEME, ...vars }))
   }, [])
 
   const fetchJenis = async () => {
@@ -101,8 +142,6 @@ export default function Pengaturan() {
     }
     if (videoFile) {
       formData.append('video', videoFile)
-    } else {
-      formData.append('video_url', videoUrl)
     }
 
     await fetch(`${getApiUrl()}/api/pengaturan_toko`, {
@@ -156,12 +195,50 @@ export default function Pengaturan() {
     navigate('/')
   }
 
+  const setThemeVar = (key, value) => {
+    setThemeVars((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const saveTheme = async (e) => {
+    e.preventDefault()
+    try {
+      await fetch(`${getApiUrl()}/api/pengaturan_tema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(themeVars)
+      })
+      applyTheme(themeVars)
+      alert('Pengaturan warna berhasil disimpan. Klik "Restart Aplikasi" agar seluruh halaman ikut memuat ulang warna baru.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyimpan pengaturan warna.')
+    }
+  }
+
+  const resetTheme = () => {
+    if (!window.confirm('Kembalikan warna ke default?')) return
+    setThemeVars(DEFAULT_THEME)
+    applyTheme(DEFAULT_THEME)
+  }
+
+  const handleRestartApp = () => {
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.restartApp === 'function') {
+      window.electronAPI.restartApp()
+      return
+    }
+    // Fallback jika dibuka di browser biasa (bukan Electron)
+    window.location.reload()
+  }
+
   return (
-    <div style={{ width: '100%', minHeight: '100vh', padding: '24px', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg-root)', color: 'var(--text)' }}>
+    <div style={{ width: '100%', minHeight: '100vh', padding: '24px', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--background)', color: 'var(--text)' }}>
         
-        <div style={{ width: '100%', marginBottom: '24px' }}>
+        <div style={{ width: '100%', marginBottom: '24px', display: 'flex', gap: '12px' }}>
           <Button type="button" onClick={handleLogout} variant="danger" style={{ cursor: 'pointer' }}>
             Logout
+          </Button>
+          <Button type="button" onClick={handleRestartApp} variant="secondary" style={{ cursor: 'pointer' }}>
+            Restart Aplikasi
           </Button>
         </div>
 
@@ -171,7 +248,7 @@ export default function Pengaturan() {
             <h1 style={{ marginTop: 0, marginBottom: '8px', fontSize: '28px', color: 'var(--text)' }}>Pengaturan Server</h1>
             <p style={{ margin: '0 0 32px 0', color: 'var(--text-muted)', fontSize: '16px' }}>IP Server: {ipAddress}</p>
 
-            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px', color: 'var(--text)' }}>Pengaturan Toko</h2>
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', color: 'var(--text)' }}>Pengaturan Toko</h2>
             <form style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }} onSubmit={savePengaturanToko}>
               <Input
                 value={namaToko}
@@ -189,7 +266,7 @@ export default function Pengaturan() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     background: 'inherit',
                     color: 'var(--text)',
@@ -226,13 +303,7 @@ export default function Pengaturan() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Video Display (URL)</span>
-                <Input
-                  value={videoUrl}
-                  onChange={(e) => { setVideoUrl(e.target.value); setVideoFile(null); setVideoPreview('') }}
-                  placeholder="https://contoh.com/video.mp4"
-                />
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Atau upload file video (mp4) di bawah ini. Jika upload file, URL di atas akan diabaikan.</span>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Upload Video Display</span>
                 <input
                   type="file"
                   accept="video/*"
@@ -240,7 +311,7 @@ export default function Pengaturan() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     background: 'inherit',
                     color: 'var(--text)',
@@ -254,6 +325,9 @@ export default function Pengaturan() {
                     style={{ width: '100%', maxHeight: '160px', borderRadius: '8px', marginTop: '8px', backgroundColor: '#000' }}
                   />
                 )}
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {videoPreview ? 'Video baru siap disimpan.' : (videoUrl ? 'Video di atas adalah video yang sedang aktif.' : 'Belum ada video yang diupload.')}
+                </span>
               </div>
 
               <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
@@ -263,7 +337,7 @@ export default function Pengaturan() {
           </Card>
 
           <Card style={{ flex: 1, minWidth: '350px', padding: '32px', boxSizing: 'border-box' }}>
-            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px', marginTop: 0, color: 'var(--text)' }}>Jenis Antrian & Loket</h2>
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', marginTop: 0, color: 'var(--text)' }}>Jenis Antrian & Loket</h2>
             <form style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }} onSubmit={saveJenis}>
               <Input
                 value={nama}
@@ -305,7 +379,7 @@ export default function Pengaturan() {
 
             <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
               {jenis.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', width: '100%', boxSizing: 'border-box' }}>
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <strong style={{ fontSize: '18px', color: 'var(--text)' }}>{item.nama}</strong>
                     <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>({item.kode_huruf}) · Shortcut: {item.shortcut || '-'}</span>
@@ -322,7 +396,7 @@ export default function Pengaturan() {
               ))}
             </div>
 
-            <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', width: '100%', borderTop: '2px solid var(--border-color)', paddingTop: '24px' }}>
+            <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', width: '100%', borderTop: '2px solid var(--border)', paddingTop: '24px' }}>
               <Button
                 type="button"
                 onClick={() => navigate('/display')}
@@ -332,6 +406,65 @@ export default function Pengaturan() {
                 Buka Display
               </Button>
             </div>
+          </Card>
+
+          <Card style={{ flex: 1, minWidth: '350px', padding: '32px', boxSizing: 'border-box' }}>
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', marginTop: 0, color: 'var(--text)' }}>Pengaturan Warna</h2>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }} onSubmit={saveTheme}>
+              {COLOR_FIELDS.map(({ key, label }) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '130px', fontSize: '13px', color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+                  <input
+                    type="color"
+                    value={extractHex(themeVars[key], '#000000')}
+                    onChange={(e) => setThemeVar(key, e.target.value)}
+                    style={{ width: '40px', height: '36px', padding: 0, border: '1px solid var(--border)', borderRadius: '6px', background: 'none', cursor: 'pointer', flexShrink: 0 }}
+                  />
+                  <Input
+                    value={themeVars[key] || ''}
+                    onChange={(e) => setThemeVar(key, e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              ))}
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Background Halaman</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="color"
+                      value={parseGradient(themeVars['--background']).start}
+                      onChange={(e) => setThemeVar('--background', buildGradient(e.target.value, parseGradient(themeVars['--background']).end))}
+                      style={{ width: '40px', height: '36px', padding: 0, border: '1px solid var(--border)', borderRadius: '6px', background: 'none', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Warna Atas</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="color"
+                      value={parseGradient(themeVars['--background']).end}
+                      onChange={(e) => setThemeVar('--background', buildGradient(parseGradient(themeVars['--background']).start, e.target.value))}
+                      style={{ width: '40px', height: '36px', padding: 0, border: '1px solid var(--border)', borderRadius: '6px', background: 'none', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Warna Bawah</span>
+                  </div>
+                </div>
+                <div style={{ height: '44px', borderRadius: '8px', border: '1px solid var(--border)', background: themeVars['--background'] }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', width: '100%', marginTop: '10px' }}>
+                <Button type="submit" variant="success" style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                  Simpan Warna
+                </Button>
+                <Button type="button" variant="secondary" onClick={resetTheme} style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                  Reset ke Default
+                </Button>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                Setelah simpan, klik tombol "Restart Aplikasi" di atas agar semua halaman (Loket, Display) ikut memuat warna baru.
+              </p>
+            </form>
           </Card>
           
         </div>

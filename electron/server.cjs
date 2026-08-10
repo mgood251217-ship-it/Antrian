@@ -155,11 +155,17 @@ function getNetworkIP() {
       db.get('SELECT * FROM jenis_antrian WHERE id = ?', [id], (err, row) => {
         if (err || !row) return res.status(500).json({ success: false });
 
-        const nextNumber = row.current_number + 1;
-        const nomorFormat = nextNumber.toString().padStart(3, '0');
-
-        db.run('UPDATE jenis_antrian SET current_number = ? WHERE id = ?', [nextNumber, id], (err) => {
+        // Nomor antrian dihitung dari jumlah antrian HARI INI saja untuk jenis ini,
+        // sehingga otomatis mulai dari 001 lagi setiap hari tanpa perlu hapus data lama.
+        db.get(`
+          SELECT COUNT(*) AS jumlah FROM antrian
+          WHERE type_id = ? AND date(datetime, 'localtime') = date('now', 'localtime')
+        `, [id], (err, countRow) => {
           if (err) return res.status(500).json({ success: false });
+
+          const nextNumber = (countRow ? countRow.jumlah : 0) + 1;
+          const nomorFormat = nextNumber.toString().padStart(3, '0');
+
           db.run('INSERT INTO antrian (type_id, nomor, status) VALUES (?, ?, ?)', [id, nomorFormat, 'menunggu'], (err) => {
             if (err) return res.status(500).json({ success: false });
 
@@ -194,7 +200,7 @@ function getNetworkIP() {
     function broadcastCounts() {
       db.all(`
         SELECT j.id, j.nama, j.kode_huruf,
-          SUM(CASE WHEN a.status = 'menunggu' THEN 1 ELSE 0 END) AS jumlah_menunggu
+          SUM(CASE WHEN a.status = 'menunggu' AND date(a.datetime, 'localtime') = date('now', 'localtime') THEN 1 ELSE 0 END) AS jumlah_menunggu
         FROM jenis_antrian j
         LEFT JOIN antrian a ON a.type_id = j.id
         GROUP BY j.id
@@ -211,7 +217,7 @@ function getNetworkIP() {
         SELECT a.nomor, j.kode_huruf 
         FROM antrian a 
         JOIN jenis_antrian j ON a.type_id = j.id 
-        WHERE a.type_id = ? AND a.status = 'menunggu' 
+        WHERE a.type_id = ? AND a.status = 'menunggu' AND date(a.datetime, 'localtime') = date('now', 'localtime')
         ORDER BY a.datetime ASC LIMIT 1
       `, [type_id], (err, row) => {
         if (err) return res.status(500).json({ success: false });
@@ -226,7 +232,7 @@ function getNetworkIP() {
         SELECT a.*, j.kode_huruf 
         FROM antrian a 
         JOIN jenis_antrian j ON a.type_id = j.id 
-        WHERE a.type_id = ? AND a.status = 'menunggu' 
+        WHERE a.type_id = ? AND a.status = 'menunggu' AND date(a.datetime, 'localtime') = date('now', 'localtime')
         ORDER BY a.datetime ASC LIMIT 1
       `, [type_id], (err, row) => {
         if (err) return res.status(500).json({ success: false });
@@ -301,6 +307,25 @@ function getNetworkIP() {
         res.json({ success: true });
       });
     });
+
+    function resetDisplayUntukHariBaru() {
+      displayState.loketA = '-';
+      displayState.currentLoket = '-';
+      displayState.lokets.forEach((l) => { l.nomor = '-'; });
+      io.emit('update_display', displayState);
+      broadcastCounts();
+    }
+
+    function scheduleResetTengahMalam() {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+      const msUntilMidnight = nextMidnight - now;
+      setTimeout(() => {
+        resetDisplayUntukHariBaru();
+        setInterval(resetDisplayUntukHariBaru, 24 * 60 * 60 * 1000);
+      }, msUntilMidnight);
+    }
+    scheduleResetTengahMalam();
 
     io.on('connection', (socket) => {
       socket.emit('init_data', displayState);

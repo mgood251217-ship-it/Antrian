@@ -56,6 +56,44 @@ function printTicketSilently() {
   window.print()
 }
 
+function TileNumber({ text, tileSize = 72, gap = 6, flashKey, emptyLabel = '' }) {
+  const isEmpty = !text || text === '-'
+
+  if (isEmpty) {
+    return (
+      <div style={{ height: `${tileSize * 1.22}px`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {emptyLabel && (
+          <span style={{ fontSize: `${Math.max(13, tileSize * 0.22)}px`, color: 'var(--text-muted)' }}>{emptyLabel}</span>
+        )}
+      </div>
+    )
+  }
+
+  const chars = String(text).split('')
+  return (
+    <div key={flashKey} className="tile-board" style={{ display: 'flex', gap: `${gap}px`, justifyContent: 'center' }}>
+      {chars.map((char, index) => (
+        char === ' '
+          ? <div key={index} style={{ width: `${tileSize * 0.35}px` }} />
+          : (
+            <div
+              key={index}
+              className="tile-cell"
+              style={{
+                width: `${tileSize}px`,
+                height: `${tileSize * 1.22}px`,
+                fontSize: `${tileSize * 0.62}px`
+              }}
+            >
+              <span>{char}</span>
+              <div className="tile-seam" />
+            </div>
+          )
+      ))}
+    </div>
+  )
+}
+
 export default function Display() {
   const navigate = useNavigate()
   const [displayState, setDisplayState] = useState({ loketA: '-', currentLoket: '-', lokets: [] })
@@ -198,11 +236,84 @@ export default function Display() {
       width: 100%;
     }
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: var(--bg-root);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background-color: var(--background);
       color: var(--text);
       overflow: hidden;
       position: relative;
+    }
+    .tabular {
+      font-family: ui-monospace, 'Cascadia Code', 'Roboto Mono', 'IBM Plex Mono', 'SF Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .tile-cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.18));
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--primary);
+      font-family: ui-monospace, 'Cascadia Code', 'Roboto Mono', 'IBM Plex Mono', 'SF Mono', monospace;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+      line-height: 1;
+    }
+    .tile-seam {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      background: rgba(0,0,0,0.35);
+    }
+    .tile-board {
+      animation: boardPulse 900ms ease-out;
+    }
+    @keyframes boardPulse {
+      0% { transform: scale(0.97); filter: brightness(1.9); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-dot.online {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    .status-dot.offline {
+      background: var(--danger);
+    }
+    .count-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px 10px 12px;
+      border-radius: 10px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--primary);
+      white-space: nowrap;
+    }
+    .running-ticker marquee {
+      font-family: ui-monospace, 'Cascadia Code', 'Roboto Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tile-board { animation: none; }
     }
     .print-ticket {
       display: none;
@@ -251,60 +362,57 @@ export default function Display() {
     <div className="display-page" style={{ width: '100%', minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{globalAndPrintStyles}</style>
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 32px', backgroundColor: 'var(--bg-card)', borderBottom: '3px solid var(--primary)' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 32px', backgroundColor: 'var(--bg-card)', borderBottom: '3px solid var(--primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {toko.logo_toko ? (
-            <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '8px' }} />
+            <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ height: '64px', width: 'auto', maxWidth: '200px', objectFit: 'contain', borderRadius: '10px' }} />
           ) : (
-            <div style={{ width: '56px', height: '56px', backgroundColor: 'var(--primary)', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontWeight: 'bold', fontSize: '24px' }}>
+            <div style={{ width: '52px', height: '52px', backgroundColor: 'var(--primary)', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontWeight: 'bold', fontSize: '22px' }}>
               {toko.nama_toko.charAt(0).toUpperCase()}
             </div>
           )}
-          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 'bold', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '1px' }}>{toko.nama_toko}</h1>
+          <div>
+            <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>Sistem Antrian</p>
+            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: 'var(--text)', letterSpacing: '0.5px' }}>{toko.nama_toko}</h1>
+          </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '36px', color: 'var(--primary)', margin: 0, fontWeight: 'bold' }}>{formatTime(now)}</p>
-          <p style={{ fontSize: '16px', color: 'var(--text-muted)', margin: 0 }}>{formatDate(now)}</p>
+          <p className="tabular" style={{ fontSize: '34px', color: 'var(--primary)', margin: 0, fontWeight: 700, lineHeight: 1 }}>{formatTime(now)}</p>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{formatDate(now)}</p>
         </div>
       </header>
 
-      {antrianCounts.length > 0 && (
-        <div style={{ display: 'flex', gap: '16px', padding: '12px 24px', overflowX: 'auto' }}>
-          {antrianCounts.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 18px',
-                borderRadius: '10px',
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>{item.nama}</span>
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>({item.kode_huruf})</span>
-              <span style={{ marginLeft: '4px', fontSize: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                {item.jumlah_menunggu}
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>menunggu</span>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '20px 24px', gap: '20px' }}>
+        <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '22px', minHeight: 0 }}>
+            <p className="eyebrow" style={{ margin: 0, fontSize: '15px' }}>Nomor Antrian</p>
+            <TileNumber
+              text={displayState.loketA}
+              tileSize={88}
+              flashKey={`${displayState.loketA}-${displayState.currentLoket}`}
+              emptyLabel="Menunggu panggilan berikutnya"
+            />
+            <p style={{ fontSize: '36px', fontWeight: 800, margin: 0, color: 'var(--text-muted)' }}>
+              LOKET <span style={{ color: 'var(--primary)' }}>{displayState.currentLoket}</span>
+            </p>
+          </div>
+
+          {antrianCounts.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', flexShrink: 0 }}>
+              <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>Menunggu Hari Ini</p>
+              {antrianCounts.map((item) => (
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '15px' }}>
+                    {item.nama} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({item.kode_huruf})</span>
+                  </span>
+                  <span className="tabular" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '24px', gap: '24px' }}>
-        <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', border: '2px solid var(--border-color)', borderRadius: '12px', padding: '24px' }}>
-          <p style={{ fontSize: '42px', fontWeight: 'bold', margin: 0, color: 'var(--text-muted)' }}>
-            LOKET <span style={{ color: 'var(--primary)' }}>{displayState.currentLoket}</span>
-          </p>
-          <p style={{ fontSize: '22px', margin: '32px 0 16px 0', color: 'var(--text)' }}>NOMOR ANTRIAN</p>
-          <p style={{ fontSize: '100px', fontWeight: 'bold', color: 'var(--primary)', margin: 0, lineHeight: 1 }}>{displayState.loketA}</p>
+          )}
         </div>
 
-        <div style={{ flex: 0.65, border: '2px solid var(--border-color)', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ flex: 0.65, border: '1px solid var(--border)', backgroundColor: '#000', borderRadius: '16px', overflow: 'hidden' }}>
           <video
             key={toko.video_url}
             width="100%"
@@ -321,36 +429,39 @@ export default function Display() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)', minHeight: '140px' }}>
+      <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '128px' }}>
         {displayState.lokets.map((loket, index) => (
-          <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '20px 0', borderRight: index === displayState.lokets.length - 1 ? 'none' : '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <p style={{ fontSize: '20px', margin: '0 0 12px 0', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+          <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '16px 8px', borderRight: index === displayState.lokets.length - 1 ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <p style={{ fontSize: '16px', margin: 0, fontWeight: 700, color: 'var(--text-muted)' }}>
               LOKET <span style={{ color: 'var(--primary)' }}>{loket.name}</span>
             </p>
-            <p style={{ fontSize: '42px', fontWeight: 'bold', margin: 0, color: loket.nomor !== '-' ? 'var(--text)' : 'var(--text-muted)' }}>{loket.nomor}</p>
-            <p style={{ marginTop: '12px', fontSize: '14px', fontWeight: '500', color: loket.online ? '#10b981' : '#ef4444' }}>
+            <TileNumber text={loket.nomor} tileSize={32} gap={3} flashKey={`${loket.name}-${loket.nomor}`} />
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: loket.online ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className={`status-dot ${loket.online ? 'online' : 'offline'}`} />
               {loket.online ? 'Online' : 'Offline'}
             </p>
           </div>
         ))}
       </div>
 
-      <div style={{ backgroundColor: 'var(--bg-root)', padding: '16px', fontSize: '24px', color: 'var(--primary)', fontWeight: 'bold', borderTop: '1px solid var(--border-color)' }}>
+      <div className="running-ticker no-print" style={{ backgroundColor: 'var(--background)', padding: '14px', fontSize: '22px', color: 'var(--primary)', fontWeight: 700, borderTop: '1px solid var(--border)' }}>
         <marquee>{toko.running_text}</marquee>
       </div>
 
       {showPreview && ticketData && (
-        <div className="no-print" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '32px', width: '320px', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
-            <h2 style={{ margin: '0 0 16px 0', color: 'var(--text)' }}>Preview Antrian</h2>
-            {toko.logo_toko && <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'contain', marginBottom: '12px' }} />}
-            <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 4px 0' }}>{ticketData.nama}</p>
-            <p style={{ fontSize: '48px', fontWeight: 'bold', color: 'var(--primary)', margin: '8px 0' }}>{ticketData.nomor}</p>
+        <div className="no-print" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '32px', width: '320px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.4)' }}>
+            <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>Preview Antrian</p>
+            <h2 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '18px' }}>{ticketData.nama}</h2>
+            {toko.logo_toko && <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '44px', height: '44px', objectFit: 'contain', marginBottom: '12px' }} />}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <TileNumber text={ticketData.nomor} tileSize={40} gap={4} />
+            </div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 24px 0' }}>{ticketData.waktu}</p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={handleBatalCetak}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '15px' }}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '15px' }}
               >
                 Batal
               </button>

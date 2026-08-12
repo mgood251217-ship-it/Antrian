@@ -5,7 +5,25 @@ import Button from '../components/Button/Button';
 import Card from '../components/Card/Card';
 import Input from '../components/Input/Input';
 import Select from '../components/Select/Select';
-import Section from '../components/Section/Section';
+import '../styles/variables.css';
+
+function formatWaktu(value) {
+  if (!value) return '-';
+  const iso = value.includes('T') ? value : value.replace(' ', 'T') + 'Z';
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString('id-ID', { hour12: false });
+}
+
+function statusInfo(status) {
+  switch (status) {
+    case 'menunggu': return { label: 'Menunggu', color: 'var(--text-muted)' };
+    case 'dipanggil': return { label: 'Dipanggil', color: 'var(--primary)' };
+    case 'selesai': return { label: 'Selesai', color: 'var(--success)' };
+    case 'batal': return { label: 'Batal', color: 'var(--danger)' };
+    default: return { label: status || '-', color: 'var(--text-muted)' };
+  }
+}
 
 export default function Loket() {
   const navigate = useNavigate();
@@ -23,6 +41,7 @@ export default function Loket() {
   const [btnUlangDisabled, setBtnUlangDisabled] = useState(true);
   const [btnSelesaiDisabled, setBtnSelesaiDisabled] = useState(true);
   const [antrianCounts, setAntrianCounts] = useState([]);
+  const [antrianList, setAntrianList] = useState([]);
 
   const socketRef = useRef();
   const timerIntervalRef = useRef();
@@ -51,6 +70,18 @@ export default function Loket() {
     } catch (err) {
       console.error(err);
       alert('Gagal memuat jenis antrian.');
+    }
+  }, [apiBaseUrl]);
+
+  const fetchAntrianList = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/antrian/hari_ini`);
+      const result = await res.json();
+      if (result.success) {
+        setAntrianList(result.data || []);
+      }
+    } catch (err) {
+      console.error(err);
     }
   }, [apiBaseUrl]);
 
@@ -84,8 +115,10 @@ export default function Loket() {
         socketRef.current.emit('loket_join', { namaLoket });
       });
       socketRef.current.on('update_counts', (counts) => setAntrianCounts(counts || []));
+      socketRef.current.on('antrian_list_changed', () => fetchAntrianList());
 
       await fetchJenisAntrian();
+      await fetchAntrianList();
     };
 
     init();
@@ -94,7 +127,7 @@ export default function Loket() {
       if (socketRef.current) socketRef.current.disconnect();
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [namaLoket, apiBaseUrl, fetchJenisAntrian]);
+  }, [namaLoket, apiBaseUrl, fetchJenisAntrian, fetchAntrianList]);
 
   useEffect(() => {
     const updatePreview = async () => {
@@ -134,6 +167,7 @@ export default function Loket() {
         timerIntervalRef.current = setInterval(updateTimer, 1000);
 
         handlePreviewAntrian(selectedJenis);
+        fetchAntrianList();
       } else {
         alert(data.message || 'Gagal memanggil antrian');
       }
@@ -151,6 +185,7 @@ export default function Loket() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ namaLoket, nomorLengkap: currentNomorLengkap })
       });
+      fetchAntrianList();
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan jaringan.');
@@ -178,6 +213,7 @@ export default function Loket() {
         setBtnUlangDisabled(true);
         setBtnSelesaiDisabled(true);
         setBtnPanggilDisabled(false);
+        fetchAntrianList();
       }
     } catch (err) {
       console.error(err);
@@ -207,6 +243,7 @@ export default function Loket() {
         setBtnUlangDisabled(true);
         setBtnSelesaiDisabled(true);
         setBtnPanggilDisabled(false);
+        fetchAntrianList();
       }
     } catch (err) {
       console.error(err);
@@ -221,101 +258,150 @@ export default function Loket() {
   };
 
   return (
-    <Section style={{ backgroundColor: 'var(--bg-root)' }}>
-      <Card style={{ backgroundColor: 'var(--bg-card)', padding: '32px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-        <h2 style={{ margin: 0, fontSize: '26px', color: 'var(--text-main)', textAlign: 'center' }}>
+    <div style={{ width: '100%', height: '100dvh', maxHeight: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', flexShrink: 0 }}>
+        <h2 style={{ margin: 0, fontSize: '24px', color: 'var(--text)' }}>
           Loket <span id="namaLoketDisplay">{namaLoket}</span>
         </h2>
+        <a href="/" className="logout" onClick={handleLogout} style={{ color: 'var(--danger)', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
+          Logout
+        </a>
+      </div>
 
-        {antrianCounts.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
-            {antrianCounts.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--bg-root)',
-                  border: '1px solid var(--border-color)'
-                }}
-              >
-                <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-main)' }}>{item.nama}</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>({item.kode_huruf})</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
-              </div>
-            ))}
+      <div style={{ flex: 1, display: 'flex', gap: '20px', padding: '0 28px 24px 28px', minHeight: 0, overflow: 'hidden' }}>
+        {/* Kolom kiri: Panggilan */}
+        <Card style={{ flex: '0 0 420px', maxWidth: '420px', backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Select
+              label="Pilih Jenis Antrian:"
+              name="category"
+              id="jenisAntrian"
+              value={selectedJenis}
+              onChange={(e) => setSelectedJenis(e.target.value)}
+              options={jenisOption}
+              margin="0"
+              style={{ width: "100%" }}
+            />
           </div>
-        )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Select
-            label="Pilih Jenis Antrian:"
-            name="category"
-            id="jenisAntrian"
-            value={selectedJenis}
-            onChange={(e) => setSelectedJenis(e.target.value)}
-            options={jenisOption}
-            margin="0"
-            style={{ width: "100%" }}
-          />
-        </div>
+          <div className="preview-text" style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', minHeight: '20px' }}>
+            {previewNomor}
+          </div>
 
-        <div className="preview-text" style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', minHeight: '20px' }}>
-          {previewNomor}
-        </div>
+          <div className="nomor-display" style={{ fontSize: '58px', fontWeight: 'bold', textAlign: 'center', color: 'var(--primary)', margin: '4px 0' }}>
+            {displayNomor}
+          </div>
+          
+          <div className="waktu-berjalan" style={{ fontSize: '20px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            {waktuBerjalan}
+          </div>
 
-        <div className="nomor-display" style={{ fontSize: '64px', fontWeight: 'bold', textAlign: 'center', color: 'var(--primary)', margin: '10px 0' }}>
-          {displayNomor}
-        </div>
-        
-        <div className="waktu-berjalan" style={{ fontSize: '20px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-          {waktuBerjalan}
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+            <Button 
+              variant="primary" 
+              onClick={handlePanggilNext}
+              disabled={btnPanggilDisabled}
+              style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+            >
+              PANGGIL BERIKUTNYA
+            </Button>
+            <Button 
+              variant="secondary" 
+              onClick={handlePanggilUlang}
+              disabled={btnUlangDisabled}
+              style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+            >
+              PANGGIL ULANG
+            </Button>
+            <Button 
+              variant="success" 
+              onClick={handleSelesai}
+              disabled={btnSelesaiDisabled}
+              style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+            >
+              SELESAI
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={handleBatal}
+              disabled={btnSelesaiDisabled}
+              style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
+            >
+              BATAL
+            </Button>
+          </div>
+        </Card>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
-          <Button 
-            variant="primary" 
-            onClick={handlePanggilNext}
-            disabled={btnPanggilDisabled}
-            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
-          >
-            PANGGIL BERIKUTNYA
-          </Button>
-          <Button 
-            variant="secondary" 
-            onClick={handlePanggilUlang}
-            disabled={btnUlangDisabled}
-            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
-          >
-            PANGGIL ULANG
-          </Button>
-          <Button 
-            variant="success" 
-            onClick={handleSelesai}
-            disabled={btnSelesaiDisabled}
-            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
-          >
-            SELESAI
-          </Button>
-          <Button 
-            variant="danger" 
-            onClick={handleBatal}
-            disabled={btnSelesaiDisabled}
-            style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
-          >
-            BATAL
-          </Button>
-        </div>
-        
-        <div style={{ textAlign: 'center', marginTop: '10px' }}>
-          <a href="/" className="logout" onClick={handleLogout} style={{ color: 'var(--danger)', textDecoration: 'none', fontWeight: '500' }}>
-            Logout
-          </a>
-        </div>
-      </Card>
-    </Section>
+        {/* Kolom kanan: Keterangan / Riwayat */}
+        <Card style={{ flex: 1, backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0, overflow: 'hidden' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text)' }}>Keterangan</h3>
+
+          {antrianCounts.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', flexShrink: 0 }}>
+              {antrianCounts.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)'
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text)' }}>{item.nama}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>({item.kode_huruf})</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', flexShrink: 0 }}>
+            Riwayat Antrian Hari Ini
+          </span>
+
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+            {antrianList.length === 0 && (
+              <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Belum ada antrian hari ini.</p>
+            )}
+            {[...antrianList].reverse().map((item) => {
+              const info = statusInfo(item.status);
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--background)',
+                    flexShrink: 0
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '15px' }}>
+                      {item.kode_huruf} {item.nomor}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {item.status === 'menunggu' && `Diambil pukul ${formatWaktu(item.datetime)}`}
+                      {item.status === 'dipanggil' && `Loket ${item.loket} • ${formatWaktu(item.waktu_panggil)}`}
+                      {item.status === 'selesai' && `Selesai • Loket ${item.loket} • ${formatWaktu(item.waktu_selesai)}`}
+                      {item.status === 'batal' && `Dibatalkan • ${formatWaktu(item.waktu_selesai)}`}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: info.color, flexShrink: 0 }}>{info.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 }

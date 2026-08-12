@@ -208,8 +208,23 @@ function getNetworkIP() {
       `, [], (err, rows) => {
         if (err) return;
         io.emit('update_counts', (rows || []).map(r => ({ ...r, jumlah_menunggu: r.jumlah_menunggu || 0 })));
+        io.emit('antrian_list_changed');
       });
     }
+
+    app.get('/api/antrian/hari_ini', (req, res) => {
+      db.all(`
+        SELECT a.id, a.nomor, a.status, a.loket, a.datetime, a.waktu_panggil, a.waktu_selesai,
+               j.kode_huruf, j.nama
+        FROM antrian a
+        JOIN jenis_antrian j ON a.type_id = j.id
+        WHERE date(a.datetime, 'localtime') = date('now', 'localtime')
+        ORDER BY a.datetime ASC
+      `, [], (err, rows) => {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true, data: rows || [] });
+      });
+    });
 
     app.post('/api/antrian/preview_next', (req, res) => {
       const { type_id } = req.body;
@@ -276,6 +291,7 @@ function getNetworkIP() {
       const { id_antrian } = req.body;
       db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['selesai', id_antrian], (err) => {
         if (err) return res.status(500).json({ success: false });
+        io.emit('antrian_list_changed');
         res.json({ success: true });
       });
     });
@@ -284,6 +300,7 @@ function getNetworkIP() {
       const { id_antrian } = req.body;
       db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['batal', id_antrian], (err) => {
         if (err) return res.status(500).json({ success: false });
+        io.emit('antrian_list_changed');
         res.json({ success: true });
       });
     });

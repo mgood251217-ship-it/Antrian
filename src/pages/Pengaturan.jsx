@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import { getApiUrl } from '../config'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
@@ -46,6 +47,39 @@ function buildGradient(start, end) {
   return `radial-gradient(circle at top, ${start}, ${end} 70%)`
 }
 
+function todayLocalDate() {
+  const d = new Date()
+  const offset = d.getTimezoneOffset()
+  const local = new Date(d.getTime() - offset * 60000)
+  return local.toISOString().slice(0, 10)
+}
+
+function formatDurasi(detik) {
+  const total = Math.round(detik || 0)
+  if (total <= 0) return '-'
+  const menit = Math.floor(total / 60)
+  const sisaDetik = total % 60
+  return `${menit}m ${sisaDetik}s`
+}
+
+function formatWaktuLengkap(value) {
+  if (!value) return '-'
+  const iso = value.includes('T') ? value : value.replace(' ', 'T') + 'Z'
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return value
+  return date.toLocaleString('id-ID', { hour12: false })
+}
+
+function statusInfo(status) {
+  switch (status) {
+    case 'menunggu': return { label: 'Menunggu', color: 'var(--text-muted)' }
+    case 'dipanggil': return { label: 'Dipanggil', color: 'var(--primary)' }
+    case 'selesai': return { label: 'Selesai', color: 'var(--success)' }
+    case 'batal': return { label: 'Batal', color: 'var(--danger)' }
+    default: return { label: status || '-', color: 'var(--text-muted)' }
+  }
+}
+
 export default function Pengaturan() {
   const navigate = useNavigate()
   const [ipAddress, setIpAddress] = useState('')
@@ -73,6 +107,14 @@ export default function Pengaturan() {
   const [userPassword, setUserPassword] = useState('')
   const [userRole, setUserRole] = useState('user')
   const [userName, setUserName] = useState('')
+
+  const [laporanTanggal, setLaporanTanggal] = useState(todayLocalDate())
+  const [laporan, setLaporan] = useState(null)
+  const [laporanLoading, setLaporanLoading] = useState(false)
+
+  const [riwayatTanggal, setRiwayatTanggal] = useState(todayLocalDate())
+  const [riwayatList, setRiwayatList] = useState([])
+  const [riwayatLoading, setRiwayatLoading] = useState(false)
 
   useEffect(() => {
     const loadServerInfo = async () => {
@@ -260,6 +302,63 @@ export default function Pengaturan() {
       body: JSON.stringify({ id })
     })
     fetchUsers()
+  }
+
+  const fetchLaporan = async (tanggal) => {
+    setLaporanLoading(true)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/laporan/harian?tanggal=${tanggal}`)
+      const data = await res.json()
+      if (data.success) setLaporan(data)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLaporanLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLaporan(laporanTanggal)
+  }, [laporanTanggal])
+
+  const fetchRiwayat = async (tanggal) => {
+    setRiwayatLoading(true)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/riwayat/antrian?tanggal=${tanggal}`)
+      const data = await res.json()
+      if (data.success) setRiwayatList(data.data || [])
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setRiwayatLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRiwayat(riwayatTanggal)
+  }, [riwayatTanggal])
+
+  const exportRiwayatExcel = () => {
+    if (!riwayatList || riwayatList.length === 0) {
+      alert('Tidak ada data riwayat untuk tanggal ini.')
+      return
+    }
+    const rows = riwayatList.map((item) => ({
+      'Nomor': `${item.kode_huruf} ${item.nomor}`,
+      'Jenis Antrian': item.nama,
+      'Status': statusInfo(item.status).label,
+      'Loket': item.loket || '-',
+      'Waktu Ambil': formatWaktuLengkap(item.datetime),
+      'Waktu Panggil': formatWaktuLengkap(item.waktu_panggil),
+      'Waktu Selesai': formatWaktuLengkap(item.waktu_selesai)
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    worksheet['!cols'] = [
+      { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
+    ]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Riwayat Antrian')
+    XLSX.writeFile(workbook, `riwayat-antrian-${riwayatTanggal}.xlsx`)
   }
 
   const handleLogout = () => {
@@ -609,6 +708,153 @@ export default function Pengaturan() {
                 Setelah simpan, klik tombol "Restart Aplikasi" di atas agar semua halaman (Loket, Display) ikut memuat warna baru.
               </p>
             </form>
+          </Card>
+
+          <Card style={{ flex: '1 1 100%', padding: '32px', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '22px', margin: 0, color: 'var(--text)' }}>Laporan Harian</h2>
+              <input
+                type="date"
+                value={laporanTanggal}
+                onChange={(e) => setLaporanTanggal(e.target.value)}
+                style={{
+                  padding: '10px 12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  background: 'inherit',
+                  color: 'var(--text)',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            {laporanLoading && <p style={{ color: 'var(--text-muted)' }}>Memuat laporan...</p>}
+
+            {!laporanLoading && laporan && (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>
+                  {[
+                    { label: 'Total Diambil', value: laporan.ringkasan.total_ambil },
+                    { label: 'Selesai', value: laporan.ringkasan.total_selesai },
+                    { label: 'Batal', value: laporan.ringkasan.total_batal },
+                    { label: 'Belum Dipanggil', value: laporan.ringkasan.total_menunggu },
+                    { label: 'Rata Waktu Tunggu', value: formatDurasi(laporan.ringkasan.rata_tunggu_detik) },
+                    { label: 'Rata Waktu Layanan', value: formatDurasi(laporan.ringkasan.rata_layanan_detik) }
+                  ].map((stat) => (
+                    <div key={stat.label} style={{ flex: '1 1 150px', padding: '16px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.label}</p>
+                      <p style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: 'var(--primary)' }}>{stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 420px' }}>
+                    <h3 style={{ fontSize: '16px', color: 'var(--text)', marginBottom: '12px' }}>Per Jenis Antrian</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {laporan.per_jenis.length === 0 && (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Belum ada jenis antrian.</p>
+                      )}
+                      {laporan.per_jenis.map((item) => (
+                        <div key={item.id} style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                            <strong style={{ color: 'var(--text)', fontSize: '15px' }}>{item.nama} <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 400 }}>({item.kode_huruf})</span></strong>
+                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '15px' }}>{item.total_ambil} diambil</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--text-muted)' }}>
+                            <span>Selesai: <strong style={{ color: 'var(--success)' }}>{item.total_selesai}</strong></span>
+                            <span>Batal: <strong style={{ color: 'var(--danger)' }}>{item.total_batal}</strong></span>
+                            <span>Menunggu: <strong style={{ color: 'var(--text)' }}>{item.total_menunggu}</strong></span>
+                            <span>Rata Tunggu: <strong style={{ color: 'var(--text)' }}>{formatDurasi(item.rata_tunggu_detik)}</strong></span>
+                            <span>Rata Layanan: <strong style={{ color: 'var(--text)' }}>{formatDurasi(item.rata_layanan_detik)}</strong></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ flex: '1 1 220px' }}>
+                    <h3 style={{ fontSize: '16px', color: 'var(--text)', marginBottom: '12px' }}>Per Loket</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {laporan.per_loket.length === 0 && (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Belum ada panggilan.</p>
+                      )}
+                      {laporan.per_loket.map((item) => (
+                        <div key={item.loket} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)' }}>
+                          <span style={{ color: 'var(--text)', fontWeight: 600 }}>Loket {item.loket}</span>
+                          <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{item.total} dilayani</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </Card>
+
+          <Card style={{ flex: '1 1 100%', padding: '32px', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '22px', margin: 0, color: 'var(--text)' }}>Riwayat Antrian</h2>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="date"
+                  value={riwayatTanggal}
+                  onChange={(e) => setRiwayatTanggal(e.target.value)}
+                  style={{
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    background: 'inherit',
+                    color: 'var(--text)',
+                    fontSize: '14px'
+                  }}
+                />
+                <Button type="button" variant="success" onClick={exportRiwayatExcel} style={{ cursor: 'pointer', padding: '10px 20px' }}>
+                  Export Excel
+                </Button>
+              </div>
+            </div>
+
+            {riwayatLoading && <p style={{ color: 'var(--text-muted)' }}>Memuat riwayat...</p>}
+
+            {!riwayatLoading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
+                {riwayatList.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Belum ada antrian pada tanggal ini.</p>
+                )}
+                {[...riwayatList].reverse().map((item) => {
+                  const info = statusInfo(item.status)
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--background)',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div style={{ minWidth: '90px' }}>
+                        <strong style={{ color: 'var(--text)', fontSize: '15px' }}>{item.kode_huruf} {item.nomor}</strong>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.nama}</div>
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', flex: 1, minWidth: '200px' }}>
+                        <span>Ambil: {formatWaktuLengkap(item.datetime)}</span>
+                        {item.loket && <span> &nbsp;•&nbsp; Loket {item.loket}</span>}
+                        {item.waktu_panggil && <span> &nbsp;•&nbsp; Panggil: {formatWaktuLengkap(item.waktu_panggil)}</span>}
+                        {item.waktu_selesai && <span> &nbsp;•&nbsp; Selesai: {formatWaktuLengkap(item.waktu_selesai)}</span>}
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: info.color, flexShrink: 0 }}>{info.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </Card>
           
         </div>

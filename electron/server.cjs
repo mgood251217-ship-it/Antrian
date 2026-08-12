@@ -292,6 +292,23 @@ function getNetworkIP() {
       });
     });
 
+    app.get('/api/riwayat/antrian', (req, res) => {
+      const rawTanggal = req.query.tanggal;
+      const tanggal = typeof rawTanggal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawTanggal) ? rawTanggal : null;
+
+      db.all(`
+        SELECT a.id, a.nomor, a.status, a.loket, a.datetime, a.waktu_panggil, a.waktu_selesai,
+               j.kode_huruf, j.nama
+        FROM antrian a
+        JOIN jenis_antrian j ON a.type_id = j.id
+        WHERE date(a.datetime, 'localtime') = COALESCE(?, date('now', 'localtime'))
+        ORDER BY a.datetime ASC
+      `, [tanggal], (err, rows) => {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true, tanggal, data: rows || [] });
+      });
+    });
+
     app.post('/api/antrian/preview_next', (req, res) => {
       const { type_id } = req.body;
       db.get(`
@@ -389,6 +406,81 @@ function getNetworkIP() {
         io.emit('update_tema', variables);
         res.json({ success: true });
       });
+    });
+
+    app.get('/api/laporan/harian', (req, res) => {
+      const rawTanggal = req.query.tanggal;
+      const tanggal = typeof rawTanggal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawTanggal) ? rawTanggal : null;
+
+      const queryPerJenis = new Promise((resolve, reject) => {
+        db.all(`
+          SELECT j.id, j.nama, j.kode_huruf,
+            COUNT(a.id) AS total_ambil,
+            SUM(CASE WHEN a.status = 'selesai' THEN 1 ELSE 0 END) AS total_selesai,
+            SUM(CASE WHEN a.status = 'batal' THEN 1 ELSE 0 END) AS total_batal,
+            SUM(CASE WHEN a.status = 'menunggu' THEN 1 ELSE 0 END) AS total_menunggu,
+            AVG(CASE WHEN a.waktu_panggil IS NOT NULL THEN (julianday(a.waktu_panggil) - julianday(a.datetime)) * 86400 END) AS rata_tunggu_detik,
+            AVG(CASE WHEN a.status = 'selesai' AND a.waktu_selesai IS NOT NULL AND a.waktu_panggil IS NOT NULL THEN (julianday(a.waktu_selesai) - julianday(a.waktu_panggil)) * 86400 END) AS rata_layanan_detik
+          FROM jenis_antrian j
+          LEFT JOIN antrian a ON a.type_id = j.id AND date(a.datetime, 'localtime') = COALESCE(?, date('now', 'localtime'))
+          GROUP BY j.id
+          ORDER BY j.id
+        `, [tanggal], (err, rows) => {
+          if (err) return reject(err);
+          resolve((rows || []).map(r => ({
+            ...r,
+            total_ambil: r.total_ambil || 0,
+            total_selesai: r.total_selesai || 0,
+            total_batal: r.total_batal || 0,
+            total_menunggu: r.total_menunggu || 0,
+            rata_tunggu_detik: r.rata_tunggu_detik || 0,
+            rata_layanan_detik: r.rata_layanan_detik || 0
+          })));
+        });
+      });
+
+      const queryPerLoket = new Promise((resolve, reject) => {
+        db.all(`
+          SELECT loket, COUNT(*) AS total
+          FROM antrian
+          WHERE loket IS NOT NULL AND date(datetime, 'localtime') = COALESCE(?, date('now', 'localtime'))
+          GROUP BY loket
+          ORDER BY loket
+        `, [tanggal], (err, rows) => {
+          if (err) return reject(err);
+          resolve(rows || []);
+        });
+      });
+
+      const queryRingkasan = new Promise((resolve, reject) => {
+        db.get(`
+          SELECT
+            COUNT(a.id) AS total_ambil,
+            SUM(CASE WHEN a.status = 'selesai' THEN 1 ELSE 0 END) AS total_selesai,
+            SUM(CASE WHEN a.status = 'batal' THEN 1 ELSE 0 END) AS total_batal,
+            SUM(CASE WHEN a.status = 'menunggu' THEN 1 ELSE 0 END) AS total_menunggu,
+            AVG(CASE WHEN a.waktu_panggil IS NOT NULL THEN (julianday(a.waktu_panggil) - julianday(a.datetime)) * 86400 END) AS rata_tunggu_detik,
+            AVG(CASE WHEN a.status = 'selesai' AND a.waktu_selesai IS NOT NULL AND a.waktu_panggil IS NOT NULL THEN (julianday(a.waktu_selesai) - julianday(a.waktu_panggil)) * 86400 END) AS rata_layanan_detik
+          FROM antrian a
+          WHERE date(a.datetime, 'localtime') = COALESCE(?, date('now', 'localtime'))
+        `, [tanggal], (err, row) => {
+          if (err) return reject(err);
+          resolve({
+            total_ambil: (row && row.total_ambil) || 0,
+            total_selesai: (row && row.total_selesai) || 0,
+            total_batal: (row && row.total_batal) || 0,
+            total_menunggu: (row && row.total_menunggu) || 0,
+            rata_tunggu_detik: (row && row.rata_tunggu_detik) || 0,
+            rata_layanan_detik: (row && row.rata_layanan_detik) || 0
+          });
+        });
+      });
+
+      Promise.all([queryPerJenis, queryPerLoket, queryRingkasan])
+        .then(([perJenis, perLoket, ringkasan]) => {
+          res.json({ success: true, tanggal: tanggal, per_jenis: perJenis, per_loket: perLoket, ringkasan });
+        })
+        .catch(() => res.status(500).json({ success: false }));
     });
 
     function resetDisplayUntukHariBaru() {

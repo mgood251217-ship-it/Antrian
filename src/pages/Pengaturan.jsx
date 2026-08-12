@@ -67,6 +67,13 @@ export default function Pengaturan() {
   const [videoPreview, setVideoPreview] = useState('')
   const [themeVars, setThemeVars] = useState(DEFAULT_THEME)
 
+  const [users, setUsers] = useState([])
+  const [userEditingId, setUserEditingId] = useState(null)
+  const [userUsername, setUserUsername] = useState('')
+  const [userPassword, setUserPassword] = useState('')
+  const [userRole, setUserRole] = useState('user')
+  const [userName, setUserName] = useState('')
+
   useEffect(() => {
     const loadServerInfo = async () => {
       try {
@@ -95,6 +102,7 @@ export default function Pengaturan() {
     loadServerInfo()
     fetchPengaturanToko()
     loadAndApplyTheme().then((vars) => setThemeVars({ ...DEFAULT_THEME, ...vars }))
+    fetchUsers()
   }, [])
 
   const fetchJenis = async () => {
@@ -188,6 +196,70 @@ export default function Pengaturan() {
       body: JSON.stringify({ id })
     })
     fetchJenis()
+  }
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/users`)
+      const data = await res.json()
+      if (data.success) setUsers(data.data)
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const saveUser = async (e) => {
+    e.preventDefault()
+    const endpoint = userEditingId ? '/api/users/edit' : '/api/users'
+    try {
+      const res = await fetch(`${getApiUrl()}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userEditingId,
+          username: userUsername,
+          password: userPassword,
+          role: userRole,
+          name: userName
+        })
+      })
+      const data = await res.json()
+      if (!data.success) {
+        alert(data.message || 'Gagal menyimpan user.')
+        return
+      }
+      resetFormUser()
+      fetchUsers()
+    } catch (error) {
+      console.error(error)
+      alert('Terjadi kesalahan jaringan.')
+    }
+  }
+
+  const editUser = (item) => {
+    setUserEditingId(item.id)
+    setUserUsername(item.username)
+    setUserPassword('')
+    setUserRole(item.role)
+    setUserName(item.name)
+  }
+
+  const resetFormUser = () => {
+    setUserEditingId(null)
+    setUserUsername('')
+    setUserPassword('')
+    setUserRole('user')
+    setUserName('')
+  }
+
+  const hapusUser = async (id) => {
+    if (!window.confirm('Hapus user ini?')) return
+    await fetch(`${getApiUrl()}/api/users/hapus`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    })
+    fetchUsers()
   }
 
   const handleLogout = () => {
@@ -405,6 +477,78 @@ export default function Pengaturan() {
               >
                 Buka Display
               </Button>
+            </div>
+          </Card>
+
+          <Card style={{ flex: 1, minWidth: '350px', padding: '32px', boxSizing: 'border-box' }}>
+            <h2 style={{ fontSize: '22px', marginBottom: '20px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', marginTop: 0, color: 'var(--text)' }}>Manajemen User</h2>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }} onSubmit={saveUser}>
+              <Input
+                value={userUsername}
+                onChange={(e) => setUserUsername(e.target.value)}
+                placeholder="Username"
+                required
+              />
+              <Input
+                value={userPassword}
+                onChange={(e) => setUserPassword(e.target.value)}
+                type="password"
+                placeholder={userEditingId ? 'Password baru (kosongkan jika tidak diubah)' : 'Password'}
+                required={!userEditingId}
+              />
+              <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    value={userRole}
+                    onChange={(e) => setUserRole(e.target.value)}
+                    options={[
+                      { value: 'user', label: 'Petugas Loket' },
+                      { value: 'server', label: 'Admin Server' }
+                    ]}
+                    margin="0"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Input
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder={userRole === 'user' ? 'Nama Loket (Cth: 1)' : 'Nama'}
+                    required
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
+                <Button type="submit" variant="primary" style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                  {userEditingId ? 'Simpan Perubahan' : 'Tambah User'}
+                </Button>
+                {userEditingId && (
+                  <Button type="button" variant="secondary" onClick={resetFormUser} style={{ cursor: 'pointer', padding: '12px 24px' }}>
+                    Batal
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+              {users.map((item) => (
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <strong style={{ fontSize: '18px', color: 'var(--text)' }}>{item.username}</strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
+                      {item.role === 'server' ? 'Admin Server' : `Petugas Loket ${item.name}`}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <Button type="button" variant="secondary" onClick={() => editUser(item)} style={{ cursor: 'pointer' }}>
+                      Edit
+                    </Button>
+                    <Button variant="danger" type="button" onClick={() => hapusUser(item.id)} style={{ cursor: 'pointer' }}>
+                      Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 

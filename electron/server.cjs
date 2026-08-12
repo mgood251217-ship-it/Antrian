@@ -78,6 +78,61 @@ function getNetworkIP() {
       });
     });
 
+    app.get('/api/users', (req, res) => {
+      db.all('SELECT id, username, role, name FROM users ORDER BY role DESC, name ASC', [], (err, rows) => {
+        if (err) return res.status(500).json({ success: false });
+        res.json({ success: true, data: rows || [] });
+      });
+    });
+
+    app.post('/api/users', (req, res) => {
+      const { username, password, role, name } = req.body;
+      if (!username || !password || !role || !name) {
+        return res.status(400).json({ success: false, message: 'Semua field wajib diisi.' });
+      }
+      db.run('INSERT INTO users (username, password, role, name) VALUES (?, ?, ?, ?)', [username, password, role, name], function (err) {
+        if (err) {
+          if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ success: false, message: 'Username sudah dipakai.' });
+          }
+          return res.status(500).json({ success: false });
+        }
+        refreshLoketsFromUsers();
+        res.json({ success: true, id: this.lastID });
+      });
+    });
+
+    app.post('/api/users/edit', (req, res) => {
+      const { id, username, password, role, name } = req.body;
+      if (!id || !username || !role || !name) {
+        return res.status(400).json({ success: false, message: 'Data tidak lengkap.' });
+      }
+      const sql = password
+        ? 'UPDATE users SET username = ?, password = ?, role = ?, name = ? WHERE id = ?'
+        : 'UPDATE users SET username = ?, role = ?, name = ? WHERE id = ?';
+      const params = password ? [username, password, role, name, id] : [username, role, name, id];
+
+      db.run(sql, params, (err) => {
+        if (err) {
+          if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ success: false, message: 'Username sudah dipakai.' });
+          }
+          return res.status(500).json({ success: false });
+        }
+        refreshLoketsFromUsers();
+        res.json({ success: true });
+      });
+    });
+
+    app.post('/api/users/hapus', (req, res) => {
+      const { id } = req.body;
+      db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
+        if (err) return res.status(500).json({ success: false });
+        refreshLoketsFromUsers();
+        res.json({ success: true });
+      });
+    });
+
     app.get('/api/server-info', (req, res) => {
       res.json({ success: true, ip: getNetworkIP() });
     });
@@ -196,6 +251,17 @@ function getNetworkIP() {
         socketId: null
       }))
     };
+
+    function refreshLoketsFromUsers() {
+      db.all("SELECT name FROM users WHERE role = 'user' ORDER BY name", [], (err, rows) => {
+        if (err) return;
+        const names = (rows || []).map(r => r.name);
+        const existingByName = {};
+        displayState.lokets.forEach((l) => { existingByName[l.name] = l; });
+        displayState.lokets = names.map((name) => existingByName[name] || { name, nomor: '-', online: false, socketId: null });
+        io.emit('update_display', displayState);
+      });
+    }
 
     function broadcastCounts() {
       db.all(`

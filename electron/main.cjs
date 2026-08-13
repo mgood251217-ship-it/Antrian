@@ -1,5 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+
+process.env.ANTRIAN_DATA_DIR = app.getPath('userData');
+
 require('./server.cjs');
 
 let mainWindow;
@@ -23,12 +26,14 @@ function createWindow() {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
 
+    // F12: keluar/masuk fullscreen (bukan lagi untuk DevTools)
     if (input.key === 'F12') {
       event.preventDefault();
       win.setFullScreen(!win.isFullScreen());
       return;
     }
 
+    // Ctrl+Shift+I: tetap untuk DevTools
     const isDevToolsShortcut = input.key && input.key.toLowerCase() === 'i' && input.control && input.shift;
     if (isDevToolsShortcut) {
       event.preventDefault();
@@ -40,7 +45,7 @@ function createWindow() {
     }
   });
 
-  const startUrl = process.env.NODE_ENV === 'production'
+  const startUrl = app.isPackaged
     ? `file://${path.join(__dirname, '../dist/index.html')}`
     : 'http://localhost:5178';
 

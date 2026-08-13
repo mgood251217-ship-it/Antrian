@@ -4,7 +4,8 @@ const fs = require('fs');
 
 function initDB() {
   return new Promise((resolve, reject) => {
-    const dataDir = path.join(__dirname, 'data');
+    const baseDir = process.env.ANTRIAN_DATA_DIR || __dirname;
+    const dataDir = path.join(baseDir, 'data');
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }

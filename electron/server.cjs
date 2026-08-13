@@ -8,7 +8,7 @@ const cors = require('cors');
 const multer = require('multer');
 const initDB = require('./database.cjs');
 
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(process.env.ANTRIAN_DATA_DIR || __dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

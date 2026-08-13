@@ -30,8 +30,23 @@ function resolveVideoUrl(video) {
   return `${getApiUrl()}${video.startsWith('/') ? '' : '/'}${video}`
 }
 
-function speakPanggilan({ kode_huruf, nomor, loket }) {
+function playChime() {
+  return new Promise((resolve) => {
+    try {
+      const audio = new Audio('/bel_antrian.mp3')
+      audio.addEventListener('ended', () => resolve())
+      audio.addEventListener('error', () => resolve())
+      audio.play().catch(() => resolve())
+    } catch (error) {
+      resolve()
+    }
+  })
+}
+
+async function speakPanggilan({ kode_huruf, nomor, loket }) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
+
+  await playChime()
 
   const nomorDieja = String(nomor || '').split('').join(' ')
   const text = `Panggilan ${kode_huruf} ${nomorDieja}, silahkan menuju loket ${loket}`

@@ -8,6 +8,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    fullscreen: true,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, 'preload.cjs')
@@ -19,10 +21,15 @@ function createWindow() {
   win.setMenuBarVisibility(false);
 
   win.webContents.on('before-input-event', (event, input) => {
-    const isDevToolsShortcut =
-      input.key === 'F12' ||
-      (input.key && input.key.toLowerCase() === 'i' && input.control && input.shift);
+    if (input.type !== 'keyDown') return;
 
+    if (input.key === 'F12') {
+      event.preventDefault();
+      win.setFullScreen(!win.isFullScreen());
+      return;
+    }
+
+    const isDevToolsShortcut = input.key && input.key.toLowerCase() === 'i' && input.control && input.shift;
     if (isDevToolsShortcut) {
       event.preventDefault();
       if (win.webContents.isDevToolsOpened()) {

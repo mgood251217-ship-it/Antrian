@@ -71,9 +71,9 @@ function initDB() {
             const insertData = `
               INSERT INTO users (username, password, role, name) VALUES
               ('admin', 'admin123', 'server', 'Display'),
-              ('loket1', 'user123', 'user', '1'),
-              ('loket2', 'user123', 'user', '2'),
-              ('loket3', 'user123', 'user', '3')
+              ('loket 1', 'maxx', 'user', '1'),
+              ('loket 2', 'maxx', 'user', '2'),
+              ('loket 3', 'maxx', 'user', '3')
             `;
             db.run(insertData);
           }
@@ -98,7 +98,7 @@ function initDB() {
           if (!row || row.count === 0) {
             db.run(`
               INSERT INTO pengaturan_toko (id, nama_toko, logo_toko, running_text) 
-              VALUES (1, 'BANK INDONESIA JAMBI', '', 'Selamat datang di Bank Indonesia Jambi - Harap menunggu antrian Anda dipanggil')
+              VALUES (1, 'Maxprint Caheum', '', 'Selamat datang di Maxprint Caheum. Tempat Percetakan untuk kebutuhan Indoor maupun Outdoor yang Lengkap Berkualitas')
             `);
           }
         });

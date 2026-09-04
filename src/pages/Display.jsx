@@ -33,7 +33,20 @@ function resolveVideoUrl(video) {
 function playChime() {
   return new Promise((resolve) => {
     try {
-      const audio = new Audio('/bel_antrian.mp3')
+      const audio = new Audio('/audio/bel.mp3')
+      audio.addEventListener('ended', () => resolve())
+      audio.addEventListener('error', () => resolve())
+      audio.play().catch(() => resolve())
+    } catch (error) {
+      resolve()
+    }
+  })
+}
+
+function playAudio(url) {
+  return new Promise((resolve) => {
+    try {
+      const audio = new Audio(url)
       audio.addEventListener('ended', () => resolve())
       audio.addEventListener('error', () => resolve())
       audio.play().catch(() => resolve())
@@ -44,18 +57,28 @@ function playChime() {
 }
 
 async function speakPanggilan({ kode_huruf, nomor, loket }) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  if (typeof window === 'undefined') return
 
   await playChime()
 
-  const nomorDieja = String(nomor || '').split('').join(' ')
-  const text = `Panggilan ${kode_huruf} ${nomorDieja}, silahkan menuju loket ${loket}`
+  await playAudio('/audio/panggilan.mp3')
 
-  window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'id-ID'
-  utterance.rate = 0.95
-  window.speechSynthesis.speak(utterance)
+  if (kode_huruf) {
+    const huruf = String(kode_huruf).toLowerCase()
+    await playAudio(`/audio/huruf/${huruf}.mp3`) 
+  }
+
+  const nomorArray = String(nomor || '').split('')
+  for (let i = 0; i < nomorArray.length; i++) {
+    const digit = nomorArray[i]
+    await playAudio(`/audio/angka/${digit}.mp3`)
+  }
+
+  await playAudio('/audio/silahkan.mp3')
+  await playAudio('/audio/menuju.mp3')
+  await playAudio('/audio/loket.mp3')
+
+  await playAudio(`/audio/angka/${loket}.mp3`)
 }
 
 function printTicketSilently() {

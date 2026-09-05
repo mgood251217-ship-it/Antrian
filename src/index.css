@@ -95,3 +95,17 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #6f7781;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6f7781;
+}

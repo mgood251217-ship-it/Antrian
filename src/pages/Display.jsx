@@ -461,11 +461,22 @@ export default function Display() {
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', flexShrink: 0 }}>
               <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>Menunggu Hari Ini</p>
               {antrianCounts.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '15px' }}>
-                    {item.nama} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({item.kode_huruf})</span>
-                  </span>
-                  <span className="tabular" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '15px' }}>
+                      {item.nama} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({item.kode_huruf})</span>
+                    </span>
+                    <span className="tabular" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAmbilAntrian(item.id)}
+                    disabled={loadingId !== null}
+                    aria-label={`Cetak antrian ${item.nama}`}
+                    style={{ padding: '8px 9px', border: '1px solid var(--primary)', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#fff', cursor: loadingId !== null ? 'wait' : 'pointer', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', opacity: loadingId !== null ? 0.6 : 1 }}
+                  >
+                    {loadingId === item.id ? '...' : 'Cetak'}
+                  </button>
                 </div>
               ))}
             </div>
@@ -489,25 +500,25 @@ export default function Display() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '128px' }}>
+      <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '148px' }}>
         {displayState.lokets.map((loket, index) => {
           const isFlashSelesai = Boolean(selesaiFlash[loket.name])
           return (
-            <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '16px 8px', borderRight: index === displayState.lokets.length - 1 ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-              <p style={{ fontSize: '16px', margin: 0, fontWeight: 700, color: 'var(--text-muted)' }}>
+            <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '6px', borderRight: index === displayState.lokets.length - 1 ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <p style={{ fontSize: '24px', margin: 0, fontWeight: 700, color: 'var(--text-muted)', padding: "5px" }}>
                 LOKET <span style={{ color: 'var(--primary)' }}>{loket.name}</span>
               </p>
-              <TileNumber text={loket.nomor} tileSize={32} gap={3} flashKey={`${loket.name}-${loket.nomor}`} />
+              <TileNumber text={loket.nomor} tileSize={45} gap={3} flashKey={`${loket.name}-${loket.nomor}`} />
               {isFlashSelesai ? (
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>
                   ✓ Selesai {selesaiFlash[loket.name]}
                 </p>
               ) : loket.status ? (
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--warning)' }}>
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--warning)' }}>
                   {loket.status}
                 </p>
               ) : (
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: loket.online ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: loket.online ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span className={`status-dot ${loket.online ? 'online' : 'offline'}`} />
                   {loket.online ? 'Online' : 'Offline'}
                 </p>
@@ -517,7 +528,7 @@ export default function Display() {
         })}
       </div>
 
-      <div className="running-ticker no-print" style={{ backgroundColor: 'var(--background)', padding: '14px', fontSize: '22px', color: 'var(--primary)', fontWeight: 700, borderTop: '1px solid var(--border)' }}>
+      <div className="running-ticker no-print" style={{ backgroundColor: 'var(--background)', padding: '6px', fontSize: '18px', color: 'var(--primary)', fontWeight: 700, borderTop: '1px solid var(--border)' }}>
         <marquee>{toko.running_text}</marquee>
       </div>
 

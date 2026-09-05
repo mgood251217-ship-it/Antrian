@@ -381,8 +381,8 @@ export default function Loket() {
               <Button type="button" variant="secondary" onClick={() => setStatus('Sholat')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
                 Sholat
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setStatus('Off')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
-                Off
+              <Button type="button" variant="secondary" onClick={() => setStatus('Masuk jam 11')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+                Masuk jam 11
               </Button>
             </div>
 

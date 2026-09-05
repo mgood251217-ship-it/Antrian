@@ -30,55 +30,66 @@ function resolveVideoUrl(video) {
   return `${getApiUrl()}${video.startsWith('/') ? '' : '/'}${video}`
 }
 
-function playChime() {
-  return new Promise((resolve) => {
-    try {
-      const audio = new Audio('/audio/bel.mp3')
-      audio.addEventListener('ended', () => resolve())
-      audio.addEventListener('error', () => resolve())
-      audio.play().catch(() => resolve())
-    } catch (error) {
-      resolve()
-    }
-  })
-}
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
 
-function playAudio(url) {
-  return new Promise((resolve) => {
-    try {
-      const audio = new Audio(url)
-      audio.addEventListener('ended', () => resolve())
-      audio.addEventListener('error', () => resolve())
-      audio.play().catch(() => resolve())
-    } catch (error) {
-      resolve()
-    }
-  })
+async function fetchAudioBuffer(url) {
+  try {
+    const response = await fetch(url)
+    const arrayBuffer = await response.arrayBuffer()
+    return await audioCtx.decodeAudioData(arrayBuffer)
+  } catch (error) {
+    return null
+  }
 }
 
 async function speakPanggilan({ kode_huruf, nomor, loket }) {
   if (typeof window === 'undefined') return
 
-  await playChime()
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume()
+  }
 
-  await playAudio('/audio/panggilan.mp3')
+  const urls = [
+    '/audio/bel.mp3',
+    '/audio/panggilan.mp3'
+  ]
 
   if (kode_huruf) {
     const huruf = String(kode_huruf).toLowerCase()
-    await playAudio(`/audio/huruf/${huruf}.mp3`) 
+    urls.push(`/audio/huruf/${huruf}.mp3`)
   }
 
   const nomorArray = String(nomor || '').split('')
   for (let i = 0; i < nomorArray.length; i++) {
-    const digit = nomorArray[i]
-    await playAudio(`/audio/angka/${digit}.mp3`)
+    urls.push(`/audio/angka/${nomorArray[i]}.mp3`)
   }
 
-  await playAudio('/audio/silahkan.mp3')
-  await playAudio('/audio/menuju.mp3')
-  await playAudio('/audio/loket.mp3')
+  urls.push(
+    '/audio/silahkan.mp3',
+    '/audio/menuju.mp3',
+    '/audio/loket.mp3',
+    `/audio/angka/${loket}.mp3`
+  )
 
-  await playAudio(`/audio/angka/${loket}.mp3`)
+  const buffers = await Promise.all(urls.map(fetchAudioBuffer))
+
+  let startTime = audioCtx.currentTime
+  
+  const overlapTime = 0.15 
+
+  for (const buffer of buffers) {
+    if (!buffer) continue
+
+    const source = audioCtx.createBufferSource()
+    source.buffer = buffer
+    
+    source.playbackRate.value = 1.05 
+    
+    source.connect(audioCtx.destination)
+    source.start(startTime)
+    
+    startTime += (buffer.duration / source.playbackRate.value) - overlapTime
+  }
 }
 
 function printTicketSilently() {
@@ -90,7 +101,6 @@ function printTicketSilently() {
   } catch (error) {
     console.error(error)
   }
-  // Fallback jika dijalankan di browser biasa (bukan Electron)
   window.print()
 }
 
@@ -142,6 +152,7 @@ export default function Display() {
   const [ticketData, setTicketData] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
   const [antrianCounts, setAntrianCounts] = useState([])
+  const [selesaiFlash, setSelesaiFlash] = useState({})
   
   const loadingRef = useRef(loadingId)
 
@@ -237,6 +248,17 @@ export default function Display() {
     socket.on('update_display', (state) => setDisplayState(state))
     socket.on('update_counts', (counts) => setAntrianCounts(counts || []))
     socket.on('panggilan_antrian', (data) => speakPanggilan(data))
+    socket.on('antrian_selesai', (data) => {
+      if (!data.loket) return
+      setSelesaiFlash((prev) => ({ ...prev, [data.loket]: `${data.kode_huruf} ${data.nomor}`.trim() }))
+      window.setTimeout(() => {
+        setSelesaiFlash((prev) => {
+          const next = { ...prev }
+          delete next[data.loket]
+          return next
+        })
+      }, 4000)
+    })
 
     return () => socket.disconnect()
   }, [])
@@ -468,18 +490,31 @@ export default function Display() {
       </div>
 
       <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '128px' }}>
-        {displayState.lokets.map((loket, index) => (
-          <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '16px 8px', borderRight: index === displayState.lokets.length - 1 ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-            <p style={{ fontSize: '16px', margin: 0, fontWeight: 700, color: 'var(--text-muted)' }}>
-              LOKET <span style={{ color: 'var(--primary)' }}>{loket.name}</span>
-            </p>
-            <TileNumber text={loket.nomor} tileSize={32} gap={3} flashKey={`${loket.name}-${loket.nomor}`} />
-            <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: loket.online ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className={`status-dot ${loket.online ? 'online' : 'offline'}`} />
-              {loket.online ? 'Online' : 'Offline'}
-            </p>
-          </div>
-        ))}
+        {displayState.lokets.map((loket, index) => {
+          const isFlashSelesai = Boolean(selesaiFlash[loket.name])
+          return (
+            <div key={loket.name} style={{ flex: 1, textAlign: 'center', padding: '16px 8px', borderRight: index === displayState.lokets.length - 1 ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <p style={{ fontSize: '16px', margin: 0, fontWeight: 700, color: 'var(--text-muted)' }}>
+                LOKET <span style={{ color: 'var(--primary)' }}>{loket.name}</span>
+              </p>
+              <TileNumber text={loket.nomor} tileSize={32} gap={3} flashKey={`${loket.name}-${loket.nomor}`} />
+              {isFlashSelesai ? (
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
+                  ✓ Selesai {selesaiFlash[loket.name]}
+                </p>
+              ) : loket.status ? (
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--warning)' }}>
+                  {loket.status}
+                </p>
+              ) : (
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: loket.online ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className={`status-dot ${loket.online ? 'online' : 'offline'}`} />
+                  {loket.online ? 'Online' : 'Offline'}
+                </p>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div className="running-ticker no-print" style={{ backgroundColor: 'var(--background)', padding: '14px', fontSize: '22px', color: 'var(--primary)', fontWeight: 700, borderTop: '1px solid var(--border)' }}>

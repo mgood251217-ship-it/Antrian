@@ -42,6 +42,8 @@ export default function Loket() {
   const [btnSelesaiDisabled, setBtnSelesaiDisabled] = useState(true);
   const [antrianCounts, setAntrianCounts] = useState([]);
   const [antrianList, setAntrianList] = useState([]);
+  const [loketStatus, setLoketStatus] = useState('');
+  const [customStatusText, setCustomStatusText] = useState('');
 
   const socketRef = useRef();
   const timerIntervalRef = useRef();
@@ -116,6 +118,10 @@ export default function Loket() {
       });
       socketRef.current.on('update_counts', (counts) => setAntrianCounts(counts || []));
       socketRef.current.on('antrian_list_changed', () => fetchAntrianList());
+      socketRef.current.on('update_display', (state) => {
+        const loket = (state.lokets || []).find((l) => l.name === namaLoket);
+        setLoketStatus(loket ? (loket.status || '') : '');
+      });
 
       await fetchJenisAntrian();
       await fetchAntrianList();
@@ -198,7 +204,7 @@ export default function Loket() {
       const res = await fetch(`${apiBaseUrl}/api/antrian/selesai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_antrian: currentAntrianId })
+        body: JSON.stringify({ id_antrian: currentAntrianId, namaLoket })
       });
       const data = await res.json();
 
@@ -228,7 +234,7 @@ export default function Loket() {
       const res = await fetch(`${apiBaseUrl}/api/antrian/batal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_antrian: currentAntrianId })
+        body: JSON.stringify({ id_antrian: currentAntrianId, namaLoket })
       });
       const data = await res.json();
 
@@ -257,8 +263,29 @@ export default function Loket() {
     navigate('/');
   };
 
+  const setStatus = async (status) => {
+    try {
+      await fetch(`${apiBaseUrl}/api/loket/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ namaLoket, status })
+      });
+      setLoketStatus(status);
+      if (status) setCustomStatusText('');
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan jaringan.');
+    }
+  };
+
+  const handleSetCustomStatus = (e) => {
+    e.preventDefault();
+    if (!customStatusText.trim()) return;
+    setStatus(customStatusText.trim());
+  };
+
   return (
-    <div style={{ width: '100%', height: '100dvh', maxHeight: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', flexShrink: 0 }}>
         <h2 style={{ margin: 0, fontSize: '24px', color: 'var(--text)' }}>
           Loket <span id="namaLoketDisplay">{namaLoket}</span>
@@ -268,9 +295,8 @@ export default function Loket() {
         </a>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', gap: '20px', padding: '0 28px 24px 28px', minHeight: 0, overflow: 'hidden' }}>
-        {/* Kolom kiri: Panggilan */}
-        <Card style={{ flex: '0 0 420px', maxWidth: '420px', backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '20px', padding: '0 28px 24px 28px', alignContent: 'flex-start' }}>
+        <Card style={{ flex: '1 1 350px', backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <Select
               label="Pilih Jenis Antrian:"
@@ -330,10 +356,51 @@ export default function Loket() {
               BATAL
             </Button>
           </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              Status Operator
+            </span>
+
+            {loketStatus && (
+              <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--warning)', fontWeight: 700, fontSize: '14px' }}>{loketStatus}</span>
+                <button
+                  onClick={() => setStatus('')}
+                  style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}
+                >
+                  Aktifkan lagi
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Istirahat')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+                Istirahat
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Sholat')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+                Sholat
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Off')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+                Off
+              </Button>
+            </div>
+
+            <form onSubmit={handleSetCustomStatus} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <Input
+                value={customStatusText}
+                onChange={(e) => setCustomStatusText(e.target.value)}
+                placeholder="Keterangan custom..."
+                style={{ width: '100%', padding: '12px', fontSize: '14px', boxSizing: 'border-box' }}
+              />
+              <Button type="submit" variant="primary" style={{ width: '100%', padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+                Set Status
+              </Button>
+            </form>
+          </div>
         </Card>
 
-        {/* Kolom kanan: Keterangan / Riwayat */}
-        <Card style={{ flex: 1, backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0, overflow: 'hidden' }}>
+        <Card style={{ flex: '2 1 400px', backgroundColor: 'var(--bg-card)', padding: '28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text)' }}>Keterangan</h3>
 
           {antrianCounts.length > 0 && (
@@ -359,11 +426,11 @@ export default function Loket() {
             </div>
           )}
 
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', flexShrink: 0 }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', flexShrink: 0, marginTop: '10px' }}>
             Riwayat Antrian Hari Ini
           </span>
 
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
             {antrianList.length === 0 && (
               <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Belum ada antrian hari ini.</p>
             )}
@@ -376,8 +443,9 @@ export default function Loket() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
+                    flexWrap: 'wrap',
                     gap: '10px',
-                    padding: '10px 12px',
+                    padding: '12px 14px',
                     borderRadius: '8px',
                     border: '1px solid var(--border)',
                     backgroundColor: 'var(--background)',
@@ -388,14 +456,14 @@ export default function Loket() {
                     <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '15px' }}>
                       {item.kode_huruf} {item.nomor}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {item.status === 'menunggu' && `Diambil pukul ${formatWaktu(item.datetime)}`}
                       {item.status === 'dipanggil' && `Loket ${item.loket} • ${formatWaktu(item.waktu_panggil)}`}
                       {item.status === 'selesai' && `Selesai • Loket ${item.loket} • ${formatWaktu(item.waktu_selesai)}`}
                       {item.status === 'batal' && `Dibatalkan • ${formatWaktu(item.waktu_selesai)}`}
                     </div>
                   </div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: info.color, flexShrink: 0 }}>{info.label}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: info.color, flexShrink: 0 }}>{info.label}</span>
                 </div>
               );
             })}

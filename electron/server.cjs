@@ -248,6 +248,7 @@ function getNetworkIP() {
         name: r.name,
         nomor: '-',
         online: false,
+        status: '',
         socketId: null
       }))
     };
@@ -258,7 +259,7 @@ function getNetworkIP() {
         const names = (rows || []).map(r => r.name);
         const existingByName = {};
         displayState.lokets.forEach((l) => { existingByName[l.name] = l; });
-        displayState.lokets = names.map((name) => existingByName[name] || { name, nomor: '-', online: false, socketId: null });
+        displayState.lokets = names.map((name) => existingByName[name] || { name, nomor: '-', online: false, status: '', socketId: null });
         io.emit('update_display', displayState);
       });
     }
@@ -371,21 +372,56 @@ function getNetworkIP() {
     });
 
     app.post('/api/antrian/selesai', (req, res) => {
-      const { id_antrian } = req.body;
-      db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['selesai', id_antrian], (err) => {
+      const { id_antrian, namaLoket } = req.body;
+      db.get(`
+        SELECT a.nomor, j.kode_huruf
+        FROM antrian a
+        JOIN jenis_antrian j ON a.type_id = j.id
+        WHERE a.id = ?
+      `, [id_antrian], (err, row) => {
         if (err) return res.status(500).json({ success: false });
+
+        db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['selesai', id_antrian], (err) => {
+          if (err) return res.status(500).json({ success: false });
+
+          const loket = displayState.lokets.find(x => x.name === namaLoket);
+          if (loket) loket.nomor = '-';
+          io.emit('update_display', displayState);
+
+          io.emit('antrian_selesai', {
+            loket: namaLoket,
+            kode_huruf: row ? row.kode_huruf : '',
+            nomor: row ? row.nomor : ''
+          });
+
+          io.emit('antrian_list_changed');
+          res.json({ success: true });
+        });
+      });
+    });
+
+    app.post('/api/antrian/batal', (req, res) => {
+      const { id_antrian, namaLoket } = req.body;
+      db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['batal', id_antrian], (err) => {
+        if (err) return res.status(500).json({ success: false });
+
+        const loket = displayState.lokets.find(x => x.name === namaLoket);
+        if (loket) loket.nomor = '-';
+        io.emit('update_display', displayState);
+
         io.emit('antrian_list_changed');
         res.json({ success: true });
       });
     });
 
-    app.post('/api/antrian/batal', (req, res) => {
-      const { id_antrian } = req.body;
-      db.run('UPDATE antrian SET status = ?, waktu_selesai = CURRENT_TIMESTAMP WHERE id = ?', ['batal', id_antrian], (err) => {
-        if (err) return res.status(500).json({ success: false });
-        io.emit('antrian_list_changed');
-        res.json({ success: true });
-      });
+    app.post('/api/loket/status', (req, res) => {
+      const { namaLoket, status } = req.body;
+      const loket = displayState.lokets.find(x => x.name === namaLoket);
+      if (!loket) return res.status(404).json({ success: false, message: 'Loket tidak ditemukan.' });
+
+      loket.status = status || '';
+      io.emit('update_display', displayState);
+      res.json({ success: true });
     });
 
     app.get('/api/pengaturan_tema', (req, res) => {

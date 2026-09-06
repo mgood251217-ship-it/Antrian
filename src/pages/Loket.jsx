@@ -163,35 +163,43 @@ export default function Loket() {
     };
   }, [namaLoket, apiBaseUrl, fetchJenisAntrian, fetchAntrianList]);
 
-  // --- FITUR AUTO RESUME (PEMULIHAN JIKA APLIKASI TER-CLOSE/REFRESH) ---
   useEffect(() => {
     if (antrianList.length === 0) return;
 
-    // Cari apakah di database loket ini punya antrian yang menggantung / masih "dipanggil"
     const ongoing = antrianList.find(item => item.status === 'dipanggil' && String(item.loket) === String(namaLoket));
 
-    if (ongoing && currentAntrianId !== ongoing.id) {
-      // Pulihkan kontrol aplikasi
-      setCurrentAntrianId(ongoing.id);
-      
-      const nomorLengkap = `${ongoing.kode_huruf} ${ongoing.nomor}`;
-      setCurrentNomorLengkap(nomorLengkap);
-      setDisplayNomor(nomorLengkap);
-      
-      setBtnUlangDisabled(false);
-      setBtnSelesaiDisabled(false);
-      setBtnPanggilDisabled(true);
+    if (ongoing) {
+      if (currentAntrianId !== ongoing.id) {
+        setCurrentAntrianId(ongoing.id);
+        
+        const nomorLengkap = `${ongoing.kode_huruf} ${ongoing.nomor}`;
+        setCurrentNomorLengkap(nomorLengkap);
+        setDisplayNomor(nomorLengkap);
+        
+        setBtnUlangDisabled(false);
+        setBtnSelesaiDisabled(false);
+        setBtnPanggilDisabled(true);
 
-      // Pulihkan timer utama di loket berdasarkan waktu asli saat pertama kali dipanggil
-      const iso = ongoing.waktu_panggil.includes('T') ? ongoing.waktu_panggil : ongoing.waktu_panggil.replace(' ', 'T') + 'Z';
-      startTimeRef.current = new Date(iso).getTime();
-      
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      updateTimer(); // update langsung detik pertama
-      timerIntervalRef.current = setInterval(updateTimer, 1000);
+        const iso = ongoing.waktu_panggil.includes('T') ? ongoing.waktu_panggil : ongoing.waktu_panggil.replace(' ', 'T') + 'Z';
+        startTimeRef.current = new Date(iso).getTime();
+        
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        updateTimer();
+        timerIntervalRef.current = setInterval(updateTimer, 1000);
+      }
+    } else {
+      if (currentAntrianId !== null) {
+        setCurrentAntrianId(null);
+        setCurrentNomorLengkap(null);
+        setDisplayNomor('-');
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        setWaktuBerjalan('00:00');
+        setBtnUlangDisabled(true);
+        setBtnSelesaiDisabled(true);
+        setBtnPanggilDisabled(false);
+      }
     }
   }, [antrianList, namaLoket, currentAntrianId, updateTimer]);
-  // ---------------------------------------------------------------------
 
   useEffect(() => {
     const updatePreview = async () => {

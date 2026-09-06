@@ -31,6 +31,7 @@ function resolveVideoUrl(video) {
 }
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+let nextAvailableAudioTime = 0
 
 async function fetchAudioBuffer(url) {
   try {
@@ -73,7 +74,7 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
 
   const buffers = await Promise.all(urls.map(fetchAudioBuffer))
 
-  let startTime = audioCtx.currentTime
+  let startTime = Math.max(audioCtx.currentTime, nextAvailableAudioTime)
   
   const overlapTime = 0.15 
   const pauseAfterSilahkan = -0.2
@@ -95,6 +96,8 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
       : -overlapTime
     startTime += (buffer.duration / source.playbackRate.value) + transitionTime
   }
+
+  nextAvailableAudioTime = startTime
 }
 
 function printTicketSilently() {
@@ -212,7 +215,7 @@ export default function Display() {
           
           if (lastCalled && (!newState.loketA || newState.loketA === '-')) {
             newState.loketA = `${lastCalled.kode_huruf} ${lastCalled.nomor}`;
-            newState.currentLoket = lastCalled.loket || ' ';
+            newState.currentLoket = lastCalled.loket || '-';
           }
           
           if (newState.lokets && newState.lokets.length > 0) {
@@ -243,7 +246,7 @@ export default function Display() {
         });
       }
     } catch (error) {
-      console.error('Gagal sinkronisasi pemulihan data:', error)
+      console.error(error)
     }
   }, [jenisAntrian]);
 
@@ -509,15 +512,15 @@ export default function Display() {
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '20px 24px', gap: '20px' }}>
         <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '42px', minHeight: 0 }}>
-            <p className="eyebrow" style={{ margin: 0, fontSize: '35px' }}>Nomor Antrian</p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '22px', minHeight: 0 }}>
+            <p className="eyebrow" style={{ margin: 0, fontSize: '15px' }}>Nomor Antrian</p>
             <TileNumber
               text={displayState.loketA}
               tileSize={88}
               flashKey={`${displayState.loketA}-${displayState.currentLoket}`}
               emptyLabel="Menunggu panggilan berikutnya"
             />
-            <p style={{ fontSize: '56px', fontWeight: 800, margin: 0, color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '36px', fontWeight: 800, margin: 0, color: 'var(--text-muted)' }}>
               LOKET <span style={{ color: 'var(--primary)' }}>{displayState.currentLoket}</span>
             </p>
           </div>

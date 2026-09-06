@@ -25,6 +25,34 @@ function statusInfo(status) {
   }
 }
 
+function TimerRealtime({ waktuPanggil }) {
+  const [duration, setDuration] = useState('00:00');
+
+  useEffect(() => {
+    if (!waktuPanggil) return;
+    const iso = waktuPanggil.includes('T') ? waktuPanggil : waktuPanggil.replace(' ', 'T') + 'Z';
+    const start = new Date(iso).getTime();
+    
+    if (isNaN(start)) return;
+
+    const updateTimer = () => {
+      const diff = Math.floor((Date.now() - start) / 1000);
+      if (diff >= 0) {
+        const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
+        const seconds = String(diff % 60).padStart(2, '0');
+        setDuration(`${minutes}:${seconds}`);
+      }
+    };
+
+    updateTimer(); 
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [waktuPanggil]);
+
+  return <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}> ({duration})</span>;
+}
+
 export default function Loket() {
   const navigate = useNavigate();
   const namaLoket = localStorage.getItem('loketName') || '1';
@@ -135,6 +163,36 @@ export default function Loket() {
     };
   }, [namaLoket, apiBaseUrl, fetchJenisAntrian, fetchAntrianList]);
 
+  // --- FITUR AUTO RESUME (PEMULIHAN JIKA APLIKASI TER-CLOSE/REFRESH) ---
+  useEffect(() => {
+    if (antrianList.length === 0) return;
+
+    // Cari apakah di database loket ini punya antrian yang menggantung / masih "dipanggil"
+    const ongoing = antrianList.find(item => item.status === 'dipanggil' && String(item.loket) === String(namaLoket));
+
+    if (ongoing && currentAntrianId !== ongoing.id) {
+      // Pulihkan kontrol aplikasi
+      setCurrentAntrianId(ongoing.id);
+      
+      const nomorLengkap = `${ongoing.kode_huruf} ${ongoing.nomor}`;
+      setCurrentNomorLengkap(nomorLengkap);
+      setDisplayNomor(nomorLengkap);
+      
+      setBtnUlangDisabled(false);
+      setBtnSelesaiDisabled(false);
+      setBtnPanggilDisabled(true);
+
+      // Pulihkan timer utama di loket berdasarkan waktu asli saat pertama kali dipanggil
+      const iso = ongoing.waktu_panggil.includes('T') ? ongoing.waktu_panggil : ongoing.waktu_panggil.replace(' ', 'T') + 'Z';
+      startTimeRef.current = new Date(iso).getTime();
+      
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      updateTimer(); // update langsung detik pertama
+      timerIntervalRef.current = setInterval(updateTimer, 1000);
+    }
+  }, [antrianList, namaLoket, currentAntrianId, updateTimer]);
+  // ---------------------------------------------------------------------
+
   useEffect(() => {
     const updatePreview = async () => {
       if (selectedJenis) {
@@ -149,6 +207,7 @@ export default function Loket() {
 
   const handlePanggilNext = async () => {
     if (!selectedJenis) return alert('Pilih jenis antrian terlebih dahulu');
+    if (loketStatus) return alert('Tidak bisa memanggil antrian saat status operator sedang aktif!');
 
     try {
       const res = await fetch(`${apiBaseUrl}/api/antrian/panggil_next`, {
@@ -264,6 +323,10 @@ export default function Loket() {
   };
 
   const setStatus = async (status) => {
+    if (currentAntrianId !== null && status !== '') {
+      return alert('Selesaikan antrian saat ini terlebih dahulu sebelum mengubah status!');
+    }
+
     try {
       await fetch(`${apiBaseUrl}/api/loket/status`, {
         method: 'POST',
@@ -283,6 +346,8 @@ export default function Loket() {
     if (!customStatusText.trim()) return;
     setStatus(customStatusText.trim());
   };
+
+  const isMelayaniAntrian = currentAntrianId !== null;
 
   return (
     <div style={{ width: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)', boxSizing: 'border-box' }}>
@@ -326,7 +391,7 @@ export default function Loket() {
             <Button 
               variant="primary" 
               onClick={handlePanggilNext}
-              disabled={btnPanggilDisabled}
+              disabled={btnPanggilDisabled || !!loketStatus}
               style={{ width: '100%', padding: '14px', fontSize: '16px', cursor: 'pointer' }}
             >
               PANGGIL BERIKUTNYA
@@ -375,13 +440,13 @@ export default function Loket() {
             )}
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Button type="button" variant="secondary" onClick={() => setStatus('Istirahat')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Istirahat')} disabled={isMelayaniAntrian} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
                 Istirahat
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setStatus('Sholat')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Sholat')} disabled={isMelayaniAntrian} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
                 Sholat
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setStatus('Masuk jam 11')} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+              <Button type="button" variant="secondary" onClick={() => setStatus('Masuk jam 11')} disabled={isMelayaniAntrian} style={{ flex: 1, padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
                 Masuk jam 11
               </Button>
             </div>
@@ -391,9 +456,10 @@ export default function Loket() {
                 value={customStatusText}
                 onChange={(e) => setCustomStatusText(e.target.value)}
                 placeholder="Keterangan custom..."
+                disabled={isMelayaniAntrian}
                 style={{ width: '100%', padding: '12px', fontSize: '14px', boxSizing: 'border-box' }}
               />
-              <Button type="submit" variant="primary" style={{ width: '100%', padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
+              <Button type="submit" variant="primary" disabled={isMelayaniAntrian || !customStatusText.trim()} style={{ width: '100%', padding: '12px', fontSize: '14px', cursor: 'pointer' }}>
                 Set Status
               </Button>
             </form>
@@ -457,10 +523,18 @@ export default function Loket() {
                       {item.kode_huruf} {item.nomor}
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {item.status === 'menunggu' && `Diambil pukul ${formatWaktu(item.datetime)}`}
-                      {item.status === 'dipanggil' && `Loket ${item.loket} • ${formatWaktu(item.waktu_panggil)}`}
-                      {item.status === 'selesai' && `Selesai • Loket ${item.loket} • ${formatWaktu(item.waktu_selesai)}`}
-                      {item.status === 'batal' && `Dibatalkan • ${formatWaktu(item.waktu_selesai)}`}
+                      {item.status === 'menunggu' && `Diambil: ${formatWaktu(item.datetime)}`}
+                      
+                      {item.status === 'dipanggil' && (
+                        <span>
+                          Loket {item.loket} • Dipanggil: {formatWaktu(item.waktu_panggil)}
+                          <TimerRealtime waktuPanggil={item.waktu_panggil} />
+                        </span>
+                      )}
+                      
+                      {item.status === 'selesai' && `Loket ${item.loket} • Dipanggil: ${formatWaktu(item.waktu_panggil)} • Selesai: ${formatWaktu(item.waktu_selesai)}`}
+                      
+                      {item.status === 'batal' && `Dibatalkan: ${formatWaktu(item.waktu_selesai)}`}
                     </div>
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: info.color, flexShrink: 0 }}>{info.label}</span>

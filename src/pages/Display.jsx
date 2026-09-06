@@ -76,8 +76,10 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
   let startTime = audioCtx.currentTime
   
   const overlapTime = 0.15 
+  const pauseAfterSilahkan = -0.2
 
-  for (const buffer of buffers) {
+  for (let index = 0; index < buffers.length; index++) {
+    const buffer = buffers[index]
     if (!buffer) continue
 
     const source = audioCtx.createBufferSource()
@@ -88,7 +90,10 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
     source.connect(audioCtx.destination)
     source.start(startTime)
     
-    startTime += (buffer.duration / source.playbackRate.value) - overlapTime
+    const transitionTime = urls[index] === '/audio/silahkan.mp3'
+      ? pauseAfterSilahkan
+      : -overlapTime
+    startTime += (buffer.duration / source.playbackRate.value) + transitionTime
   }
 }
 

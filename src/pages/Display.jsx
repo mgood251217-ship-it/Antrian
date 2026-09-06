@@ -195,6 +195,66 @@ export default function Display() {
     }
   }, [])
 
+  const fetchStateRecovery = useCallback(async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/antrian/hari_ini`)
+      const result = await res.json()
+      
+      if (result.success && result.data) {
+        const list = result.data;
+        
+        const calledList = list.filter(item => item.status === 'dipanggil' || item.status === 'selesai');
+        calledList.sort((a, b) => new Date(b.waktu_panggil).getTime() - new Date(a.waktu_panggil).getTime());
+        const lastCalled = calledList[0];
+
+        setDisplayState(prev => {
+          const newState = { ...prev };
+          
+          if (lastCalled && (!newState.loketA || newState.loketA === '-')) {
+            newState.loketA = `${lastCalled.kode_huruf} ${lastCalled.nomor}`;
+            newState.currentLoket = lastCalled.loket || ' ';
+          }
+          
+          if (newState.lokets && newState.lokets.length > 0) {
+            newState.lokets = newState.lokets.map(loket => {
+              const activeAntrian = list.find(item => item.status === 'dipanggil' && String(item.loket) === String(loket.name));
+              if (activeAntrian) {
+                return { ...loket, nomor: `${activeAntrian.kode_huruf} ${activeAntrian.nomor}` };
+              }
+              return loket;
+            });
+          }
+          return newState;
+        });
+
+        setAntrianCounts(prev => {
+          if (prev.length === 0 && jenisAntrian.length > 0) {
+            return jenisAntrian.map(jenis => {
+              const count = list.filter(item => item.type_id === jenis.id && item.status === 'menunggu').length;
+              return {
+                id: jenis.id,
+                nama: jenis.nama,
+                kode_huruf: jenis.kode_huruf || jenis.kode || '',
+                jumlah_menunggu: count
+              };
+            });
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error('Gagal sinkronisasi pemulihan data:', error)
+    }
+  }, [jenisAntrian]);
+
+  useEffect(() => {
+    if (jenisAntrian.length > 0) {
+      fetchStateRecovery();
+    }
+    const interval = setInterval(fetchStateRecovery, 10000);
+    return () => clearInterval(interval);
+  }, [fetchStateRecovery, jenisAntrian]);
+
   const handleAmbilAntrian = async (id) => {
     if (loadingRef.current === id) return
     setLoadingId(id)
@@ -449,15 +509,15 @@ export default function Display() {
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, padding: '20px 24px', gap: '20px' }}>
         <div style={{ flex: 0.35, backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '22px', minHeight: 0 }}>
-            <p className="eyebrow" style={{ margin: 0, fontSize: '15px' }}>Nomor Antrian</p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '42px', minHeight: 0 }}>
+            <p className="eyebrow" style={{ margin: 0, fontSize: '35px' }}>Nomor Antrian</p>
             <TileNumber
               text={displayState.loketA}
               tileSize={88}
               flashKey={`${displayState.loketA}-${displayState.currentLoket}`}
               emptyLabel="Menunggu panggilan berikutnya"
             />
-            <p style={{ fontSize: '36px', fontWeight: 800, margin: 0, color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '56px', fontWeight: 800, margin: 0, color: 'var(--text-muted)' }}>
               LOKET <span style={{ color: 'var(--primary)' }}>{displayState.currentLoket}</span>
             </p>
           </div>

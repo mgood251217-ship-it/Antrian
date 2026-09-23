@@ -30,6 +30,12 @@ function resolveVideoUrl(video) {
   return `${getApiUrl()}${video.startsWith('/') ? '' : '/'}${video}`
 }
 
+function resolveAudioUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  return `${getApiUrl()}${path.startsWith('/') ? '' : '/'}${path}`
+}
+
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
 let nextAvailableAudioTime = 0
 
@@ -50,28 +56,29 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
     await audioCtx.resume()
   }
 
-  const urls = [
+  const rawUrls = [
     '/audio/bel.mp3',
     '/audio/panggilan.mp3'
   ]
 
   if (kode_huruf) {
     const huruf = String(kode_huruf).toLowerCase()
-    urls.push(`/audio/huruf/${huruf}.mp3`)
+    rawUrls.push(`/audio/huruf/${huruf}.mp3`)
   }
 
   const nomorArray = String(nomor || '').split('')
   for (let i = 0; i < nomorArray.length; i++) {
-    urls.push(`/audio/angka/${nomorArray[i]}.mp3`)
+    rawUrls.push(`/audio/angka/${nomorArray[i]}.mp3`)
   }
 
-  urls.push(
+  rawUrls.push(
     '/audio/silahkan.mp3',
     '/audio/menuju.mp3',
     '/audio/loket.mp3',
     `/audio/angka/${loket}.mp3`
   )
 
+  const urls = rawUrls.map(resolveAudioUrl)
   const buffers = await Promise.all(urls.map(fetchAudioBuffer))
 
   let startTime = Math.max(audioCtx.currentTime, nextAvailableAudioTime)
@@ -91,7 +98,7 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
     source.connect(audioCtx.destination)
     source.start(startTime)
     
-    const transitionTime = urls[index] === '/audio/silahkan.mp3'
+    const transitionTime = rawUrls[index] === '/audio/silahkan.mp3'
       ? pauseAfterSilahkan
       : -overlapTime
     startTime += (buffer.duration / source.playbackRate.value) + transitionTime

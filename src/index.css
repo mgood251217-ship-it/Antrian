@@ -43,15 +43,6 @@ body {
   overflow-y: auto;
 }
 
-#root {
-  width: 100%;
-  min-height: 100dvh;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
 h1,
 h2 {
   font-family: var(--heading);

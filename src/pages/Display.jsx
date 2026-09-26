@@ -107,16 +107,65 @@ async function speakPanggilan({ kode_huruf, nomor, loket }) {
   nextAvailableAudioTime = startTime
 }
 
-function printTicketSilently() {
-  try {
-    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printTicket === 'function') {
-      window.electronAPI.printTicket()
-      return
+async function printTicketSilently(ticket, toko) {
+  const query = new URLSearchParams({
+    toko: toko?.nama_toko || '',
+    logo: toko?.logo_toko || '',
+    nomor: ticket?.nomor || '',
+    nama: ticket?.nama || '',
+    waktu: ticket?.waktu || ''
+  }).toString()
+  
+  let url = ''
+  const currentUrl = window.location.href
+  if (currentUrl.includes('#')) {
+    url = currentUrl.split('#')[0] + '#/cetak?' + query
+  } else {
+    try {
+      const urlObj = new URL(currentUrl)
+      urlObj.pathname = '/cetak'
+      urlObj.search = '?' + query
+      url = urlObj.toString()
+    } catch (err) {
+      url = `${window.location.origin}/cetak?${query}`
     }
-  } catch (error) {
-    console.error(error)
   }
-  window.print()
+
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printUrl === 'function') {
+    try {
+      await window.electronAPI.printUrl(url)
+    } catch (error) {
+      console.error(error)
+    }
+  } else {
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.src = url
+    document.body.appendChild(iframe)
+    
+    let printed = false
+    iframe.onload = () => {
+      if (printed) return
+      printed = true
+      
+      window.setTimeout(() => {
+        try {
+          iframe.contentWindow.focus()
+          iframe.contentWindow.print()
+        } catch (e) {
+          console.error(e)
+        }
+        window.setTimeout(() => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe)
+        }, 60000)
+      }, 500)
+    }
+  }
 }
 
 function TileNumber({ text, tileSize = 72, gap = 6, flashKey, emptyLabel = '' }) {
@@ -134,7 +183,7 @@ function TileNumber({ text, tileSize = 72, gap = 6, flashKey, emptyLabel = '' })
 
   const chars = String(text).split('')
   return (
-    <div key={flashKey} className="tile-board" style={{ display: 'flex', gap: `${gap}px`, justifyContent: 'center' }}>
+    <div key={flashKey} className="tile-board" style={{ display: 'flex', gap: `${gap}px`, justifyContent: 'center'}}>
       {chars.map((char, index) => (
         char === ' '
           ? <div key={index} style={{ width: `${tileSize * 0.35}px` }} />
@@ -169,11 +218,10 @@ export default function Display() {
   const [antrianCounts, setAntrianCounts] = useState([])
   const [selesaiFlash, setSelesaiFlash] = useState({})
   
-  const loadingRef = useRef(loadingId)
+  const [isConfirmPrinting, setIsConfirmPrinting] = useState(false)
+  const printLockRef = useRef(false)
 
-  useEffect(() => {
-    loadingRef.current = loadingId
-  }, [loadingId])
+  const PRINT_COOLDOWN_MS = 1200
 
   const fetchJenisAntrian = useCallback(async () => {
     try {
@@ -237,20 +285,30 @@ export default function Display() {
           return newState;
         });
 
-        setAntrianCounts(prev => {
-          if (prev.length === 0 && jenisAntrian.length > 0) {
-            return jenisAntrian.map(jenis => {
-              const count = list.filter(item => item.type_id === jenis.id && item.status === 'menunggu').length;
+        if (jenisAntrian.length > 0) {
+          setAntrianCounts(
+            jenisAntrian.map(jenis => {
+              const kodeJenis = jenis.kode_huruf || jenis.kode || '';
+              const itemsForJenis = list.filter(item => item.kode_huruf === kodeJenis);
+              const jumlah_menunggu = itemsForJenis.filter(item => item.status === 'menunggu').length;
+
+              const calledForJenis = itemsForJenis
+                .filter(item => item.status === 'dipanggil' || item.status === 'selesai')
+                .sort((a, b) => new Date(b.waktu_panggil).getTime() - new Date(a.waktu_panggil).getTime());
+              const lastCalledForJenis = calledForJenis[0];
+
               return {
                 id: jenis.id,
                 nama: jenis.nama,
-                kode_huruf: jenis.kode_huruf || jenis.kode || '',
-                jumlah_menunggu: count
+                kode_huruf: kodeJenis,
+                jumlah_menunggu,
+                nomor_terakhir: lastCalledForJenis
+                  ? `${lastCalledForJenis.kode_huruf} ${lastCalledForJenis.nomor}`.trim()
+                  : null
               };
-            });
-          }
-          return prev;
-        });
+            })
+          );
+        }
       }
     } catch (error) {
       console.error(error)
@@ -265,9 +323,22 @@ export default function Display() {
     return () => clearInterval(interval);
   }, [fetchStateRecovery, jenisAntrian]);
 
-  const handleAmbilAntrian = async (id) => {
-    if (loadingRef.current === id) return
+  const handleAmbilAntrian = useCallback(async (id) => {
+    if (printLockRef.current) return
+    printLockRef.current = true
     setLoadingId(id)
+
+    const releaseLockAfterCooldown = () => {
+      window.setTimeout(() => {
+        printLockRef.current = false
+        setLoadingId(null)
+      }, PRINT_COOLDOWN_MS)
+    }
+
+    const releaseLockNow = () => {
+      printLockRef.current = false
+      setLoadingId(null)
+    }
 
     try {
       const res = await fetch(`${getApiUrl()}/api/cetak_antrian`, {
@@ -288,24 +359,40 @@ export default function Display() {
 
         if (toko.print_mode === 'preview') {
           setShowPreview(true)
-          setLoadingId(null)
+          releaseLockNow()
         } else if (typeof window !== 'undefined') {
-          window.setTimeout(() => {
-            printTicketSilently()
-            setLoadingId(null)
+          window.setTimeout(async () => {
+            try {
+              await printTicketSilently(nextTicket, toko)
+            } finally {
+              releaseLockAfterCooldown()
+            }
           }, 300)
+        } else {
+          releaseLockNow()
         }
       } else {
-        setLoadingId(null)
+        releaseLockNow()
       }
     } catch (error) {
-      setLoadingId(null)
+      releaseLockNow()
     }
-  }
+  }, [toko])
 
-  const handleKonfirmasiCetak = () => {
-    printTicketSilently()
-    setShowPreview(false)
+  const handleKonfirmasiCetak = async () => {
+    if (printLockRef.current) return
+    printLockRef.current = true
+    setIsConfirmPrinting(true)
+
+    try {
+      await printTicketSilently(ticketData, toko)
+    } finally {
+      setShowPreview(false)
+      window.setTimeout(() => {
+        printLockRef.current = false
+        setIsConfirmPrinting(false)
+      }, PRINT_COOLDOWN_MS)
+    }
   }
 
   const handleBatalCetak = () => {
@@ -319,10 +406,37 @@ export default function Display() {
 
   useEffect(() => {
     const socket = io(getApiUrl())
+    socket.on('connect', () => {
+      fetchPengaturanToko()
+    })
     socket.on('init_data', (state) => setDisplayState(state))
     socket.on('update_display', (state) => setDisplayState(state))
-    socket.on('update_counts', (counts) => setAntrianCounts(counts || []))
-    socket.on('panggilan_antrian', (data) => speakPanggilan(data))
+    socket.on('update_toko', (data) => {
+      if (!data) return
+      setToko({
+        nama_toko: data.nama_toko || 'NAMA TOKO',
+        logo_toko: data.logo_toko || '',
+        running_text: data.running_text || 'Selamat datang',
+        print_mode: data.print_mode || 'langsung',
+        video_url: data.video_url || ''
+      })
+    })
+    socket.on('update_counts', (counts) => {
+      setAntrianCounts(prev => (counts || []).map(item => {
+        const existing = prev.find(p => p.id === item.id)
+        return {
+          ...item,
+          nomor_terakhir: item.nomor_terakhir ?? existing?.nomor_terakhir ?? null
+        }
+      }))
+    })
+    socket.on('panggilan_antrian', (data) => {
+      speakPanggilan(data)
+      setAntrianCounts(prev => prev.map(item => {
+        if (item.kode_huruf !== data.kode_huruf) return item
+        return { ...item, nomor_terakhir: `${data.kode_huruf} ${data.nomor}`.trim() }
+      }))
+    })
     socket.on('antrian_selesai', (data) => {
       if (!data.loket) return
       setSelesaiFlash((prev) => ({ ...prev, [data.loket]: `${data.kode_huruf} ${data.nomor}`.trim() }))
@@ -336,7 +450,7 @@ export default function Display() {
     })
 
     return () => socket.disconnect()
-  }, [])
+  }, [fetchPengaturanToko])
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
@@ -354,14 +468,14 @@ export default function Display() {
         (item) => item.shortcut && item.shortcut.toLowerCase() === event.key.toLowerCase()
       )
 
-      if (matchedAntrian && !loadingRef.current) {
+      if (matchedAntrian && !printLockRef.current) {
         handleAmbilAntrian(matchedAntrian.id)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [jenisAntrian, navigate])
+  }, [jenisAntrian, navigate, handleAmbilAntrian])
 
   const globalAndPrintStyles = `
     html, body, #root {
@@ -450,51 +564,10 @@ export default function Display() {
     @media (prefers-reduced-motion: reduce) {
       .tile-board { animation: none; }
     }
-    .print-ticket {
-      display: none;
-    }
-    @media print {
-      @page {
-        margin: 0;
-        size: 58mm auto;
-      }
-      html, body, #root, .display-page {
-        background-color: #ffffff !important;
-      }
-      body {
-        background-color: #ffffff !important;
-      }
-      body * {
-        visibility: hidden;
-      }
-      .display-page > :not(.print-ticket) {
-        display: none !important;
-      }
-      .print-ticket {
-        display: block !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 58mm;
-        padding: 4mm;
-        background: #ffffff !important;
-        color: #000000;
-        text-align: center;
-        font-family: 'Courier New', Courier, monospace;
-        box-sizing: border-box;
-        margin: 0;
-      }
-      .print-ticket * {
-        visibility: visible;
-      }
-      .no-print {
-        display: none !important;
-      }
-    }
   `
 
   return (
-    <div className="display-page" style={{ width: '100%', minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="display-page" style={{ width: '100%', minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--background)' }}>
       <style>{globalAndPrintStyles}</style>
 
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 32px', backgroundColor: 'var(--bg-card)', borderBottom: '3px solid var(--primary)' }}>
@@ -543,14 +616,20 @@ export default function Display() {
                     </span>
                     <span className="tabular" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{item.jumlah_menunggu}</span>
                   </div>
+                  {item.nomor_terakhir && (
+                    <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '15px', whiteSpace: 'nowrap' }}>Terakhir</span>
+                      <span className="tabular" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{item.nomor_terakhir}</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleAmbilAntrian(item.id)}
-                    disabled={loadingId !== null}
+                    disabled={loadingId !== null || isConfirmPrinting}
                     aria-label={`Cetak antrian ${item.nama}`}
-                    style={{ padding: '8px 9px', border: '1px solid var(--primary)', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#fff', cursor: loadingId !== null ? 'wait' : 'pointer', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', opacity: loadingId !== null ? 0.6 : 1 }}
+                    style={{ flexShrink: 0, padding: '8px 9px', border: '1px solid var(--primary)', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#fff', cursor: (loadingId !== null || isConfirmPrinting) ? 'wait' : 'pointer', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', opacity: (loadingId !== null || isConfirmPrinting) ? 0.6 : 1 }}
                   >
-                    {loadingId === item.id ? '...' : 'Cetak'}
+                    {loadingId === item.id ? 'Mencetak...' : 'Cetak'}
                   </button>
                 </div>
               ))}
@@ -620,32 +699,20 @@ export default function Display() {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={handleBatalCetak}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '15px' }}
+                disabled={isConfirmPrinting}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text)', cursor: isConfirmPrinting ? 'wait' : 'pointer', fontSize: '15px', opacity: isConfirmPrinting ? 0.6 : 1 }}
               >
                 Batal
               </button>
               <button
                 onClick={handleKonfirmasiCetak}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#fff', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}
+                disabled={isConfirmPrinting}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#fff', cursor: isConfirmPrinting ? 'wait' : 'pointer', fontSize: '15px', fontWeight: 'bold', opacity: isConfirmPrinting ? 0.7 : 1 }}
               >
-                Cetak
+                {isConfirmPrinting ? 'Mencetak...' : 'Cetak'}
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {ticketData && (
-        <div className="print-ticket">
-          {toko.logo_toko && <img src={resolveLogoUrl(toko.logo_toko)} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', marginBottom: '8px' }} />}
-          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>{toko.nama_toko}</div>
-          <div style={{ borderBottom: '1px dashed black', margin: '8px 0' }}></div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '1px' }}>ANTRIAN</div>
-          <div style={{ fontSize: '14px', marginBottom: '12px' }}>{ticketData.nama}</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', margin: '12px 0' }}>{ticketData.nomor}</div>
-          <div style={{ borderBottom: '1px dashed black', margin: '12px 0' }}></div>
-          <div style={{ fontSize: '11px', marginTop: '8px' }}>{ticketData.waktu}</div>
-          <div style={{ fontSize: '11px', marginTop: '8px', padding: '0 4px' }}>Silakan menunggu sampai nomor Anda dipanggil.</div>
         </div>
       )}
     </div>

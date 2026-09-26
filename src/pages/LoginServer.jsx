@@ -44,21 +44,23 @@ export default function LoginServer() {
   }
 
   return (
-    <Section>
-      <Card>
-        <div className="page-header-row">
-          <Button type="button" onClick={() => navigate(-1)}>
-            ← Kembali
-          </Button>
-        </div>
-        <h1>Login Server</h1>
-        <form className="form-group" onSubmit={handleSubmit}>
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" required />
-          <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" required />
-          <Button type="submit">Masuk</Button>
-        </form>
-        {error && <p className="error">{error}</p>}
-      </Card>
-    </Section>
+    <div style={{ width: '100%', minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--background)' }}>
+      <Section>
+        <Card>
+          <div className="page-header-row">
+            <Button type="button" onClick={() => navigate(-1)}>
+              ← Kembali
+            </Button>
+          </div>
+          <h1>Login Server</h1>
+          <form className="form-group" onSubmit={handleSubmit}>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" required />
+            <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" required />
+            <Button type="submit">Masuk</Button>
+          </form>
+          {error && <p className="error">{error}</p>}
+        </Card>
+      </Section>
+    </div>
   )
 }

@@ -28,9 +28,12 @@
     }
   },
   "dependencies": {
+    "@ssxv/node-printer": "^1.1.1",
     "cors": "^2.8.5",
     "express": "^4.18.4",
+    "jspdf": "^4.2.1",
     "multer": "^2.2.0",
+    "node-thermal-printer": "^4.6.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^6.14.2",

@@ -5,6 +5,7 @@ import LoginUser from './pages/LoginUser'
 import Loket from './pages/Loket'
 import Pengaturan from './pages/Pengaturan'
 import Display from './pages/Display'
+import Cetak from './pages/Cetak'
 import './App.css'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/loket" element={<Loket />} />
         <Route path="/pengaturan" element={<Pengaturan />} />
         <Route path="/display" element={<Display />} />
+        <Route path="/cetak" element={<Cetak />} />
       </Routes>
     </Router>
   )

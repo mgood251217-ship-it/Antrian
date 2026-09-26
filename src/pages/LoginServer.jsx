@@ -16,7 +16,7 @@ export default function LoginServer() {
   useEffect(() => {
     const session = getServerSession()
     if (session) {
-      navigate('/pengaturan')
+      navigate('/display')
     }
   }, [navigate])
 
@@ -34,7 +34,7 @@ export default function LoginServer() {
       
       if (data.success && data.role === 'server') {
         setServerSession({ role: data.role })
-        navigate('/pengaturan')
+        navigate('/display')
       } else {
         setError('Kredensial server tidak valid.')
       }

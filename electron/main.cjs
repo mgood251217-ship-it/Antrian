@@ -103,10 +103,8 @@ function createWindow() {
 
   const startUrl = getAppBaseUrl();
 
-  setTimeout(() => {
-    win.loadURL(startUrl);
-    warmupPrintWindow();
-  }, 4000);
+  win.loadURL(startUrl);
+  warmupPrintWindow();
 }
 
 ipcMain.on('restart-app', () => {
@@ -167,6 +165,13 @@ ipcMain.handle('print-url', async (event, url) => {
 });
 
 app.whenReady().then(() => {
+  if (app.isPackaged) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: process.execPath
+    });
+  }
+
   createWindow();
 
   app.on('activate', () => {

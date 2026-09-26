@@ -1,10 +1,23 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button/Button'
 import Card from '../components/Card/Card'
 import Section from '../components/Section/Section'
+import { getServerSession } from '../services/session'
 
 export default function Home() {
   const navigate = useNavigate()
+  const [hasSession] = useState(() => !!getServerSession())
+
+  useEffect(() => {
+    if (hasSession) {
+      navigate('/display', { replace: true })
+    }
+  }, [hasSession, navigate])
+
+  if (hasSession) {
+    return null
+  }
 
   return (
     <div style={{ background: 'var(--background)' }}>
